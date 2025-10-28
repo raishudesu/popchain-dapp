@@ -1,4 +1,12 @@
-import { Award, QrCode, Sparkles } from "lucide-react";
+import {
+  Award,
+  QrCode,
+  Sparkles,
+  Ticket,
+  Star,
+  Trophy,
+  Medal,
+} from "lucide-react";
 
 export const features = [
   {
@@ -11,7 +19,7 @@ export const features = [
     icon: <Award className="w-8 h-8" />,
     title: "NFT Certificates & Badges",
     description:
-      "Mint verifiable NFTs as proof of attendance plus special badges for side quests and rewards",
+      "Mint verifiable standard to premium NFTs as proof of attendance and achievements",
   },
   {
     icon: <Sparkles className="w-8 h-8" />,
@@ -21,11 +29,42 @@ export const features = [
   },
 ];
 
+export const tiers = [
+  {
+    icon: Ticket,
+    title: "PopPass",
+    description: "Proof of Attendance",
+    tier: "Basic",
+    iconColor: "text-purple-500",
+  },
+  {
+    icon: Star,
+    title: "PopBadge",
+    description: "Activity / Side Quest",
+    tier: "Standard",
+    iconColor: "text-blue-500",
+  },
+  {
+    icon: Medal,
+    title: "PopMedal",
+    description: "Distinction / Speaker",
+    tier: "Premium",
+    iconColor: "text-yellow-500",
+  },
+  {
+    icon: Trophy,
+    title: "PopTrophy",
+    description: "VIP / Sponsor",
+    tier: "Exclusive",
+    iconColor: "text-pink-500",
+  },
+];
+
 export const howItWorks = [
   {
     step: "1",
     title: "Organizer Creates Event",
-    desc: "Set up your event and configure NFT rewards",
+    desc: "Set up your event and configure NFT rewards and upload whitelisted attendees",
   },
   {
     step: "2",
@@ -40,6 +79,6 @@ export const howItWorks = [
   {
     step: "4",
     title: "Mint NFT Certificate",
-    desc: "Instant NFT minting + badges for achievements",
+    desc: "Instant NFT minting at event conclusion",
   },
 ];

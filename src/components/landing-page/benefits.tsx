@@ -13,7 +13,7 @@ const Benefits = () => {
               {[
                 "Verifiable proof of attendance on blockchain",
                 "Instant NFT minting at event conclusion",
-                "Collectible badges for achievements & side quests",
+                "Collectible tiered NFT certificates for achievements & recognition",
                 "Portable credentials across all platforms",
                 "Fraud-proof and tamper-resistant",
                 "Perfect for conferences, seminars & educational events",

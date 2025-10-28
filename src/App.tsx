@@ -2,6 +2,7 @@ import "./App.css";
 import Nav from "./components/landing-page/nav";
 import Hero from "./components/landing-page/hero";
 import Features from "./components/landing-page/features";
+import Tiers from "./components/landing-page/tiers";
 import HowItWorks from "./components/landing-page/how-it-works";
 import Benefits from "./components/landing-page/benefits";
 import Cta from "./components/landing-page/cta";
@@ -13,6 +14,7 @@ export default function Home() {
       <Nav />
       <Hero />
       <Features />
+      <Tiers />
       <HowItWorks />
       <Benefits />
       <Cta />
