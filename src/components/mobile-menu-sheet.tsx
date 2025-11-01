@@ -1,6 +1,6 @@
 import { ModeToggle } from "./mode-toggle";
-import { Button, buttonVariants } from "./ui/button";
-import { ConnectButton } from "@mysten/dapp-kit";
+import { Button } from "./ui/button";
+import { NavConnectButton } from "./nav-connect-button";
 import {
   Sheet,
   SheetContent,
@@ -9,7 +9,6 @@ import {
   SheetTrigger,
 } from "./ui/sheet";
 import { Menu } from "lucide-react";
-import { cn } from "@/lib/utils";
 
 interface NavLink {
   href: string;
@@ -57,9 +56,7 @@ export function MobileMenuSheet({
             <a href="/login" onClick={() => onOpenChange(false)}>
               <Button className="btn-gradient w-full">Get Started</Button>
             </a>
-            <ConnectButton
-              className={cn(buttonVariants({ variant: "outline" }), "w-full")}
-            />
+            <NavConnectButton className="w-full" />
           </div>
         </div>
       </SheetContent>

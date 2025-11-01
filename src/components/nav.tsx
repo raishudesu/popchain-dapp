@@ -1,9 +1,8 @@
 import { useState } from "react";
 import { ModeToggle } from "./mode-toggle";
-import { Button, buttonVariants } from "./ui/button";
-import { ConnectButton } from "@mysten/dapp-kit";
+import { Button } from "./ui/button";
+import { NavConnectButton } from "./nav-connect-button";
 import { MobileMenuSheet } from "./mobile-menu-sheet";
-import { cn } from "@/lib/utils";
 
 const Nav = () => {
   const [open, setOpen] = useState(false);
@@ -44,9 +43,7 @@ const Nav = () => {
           <a href="/login">
             <Button className="btn-gradient">Get Started</Button>
           </a>
-          <ConnectButton
-            className={cn(buttonVariants({ variant: "outline" }))}
-          />
+          <NavConnectButton />
         </div>
         <div className="lg:hidden">
           <MobileMenuSheet
