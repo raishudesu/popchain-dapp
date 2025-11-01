@@ -1,6 +1,6 @@
+import Iridescence from "@/components/Iridescence";
+import { Button } from "@/components/ui/button";
 import { ArrowRight, CheckCircle2, Shield, Zap } from "lucide-react";
-import { Button } from "../../components/ui/button";
-import Iridescence from "../../components/Iridescence";
 
 const Hero = () => {
   return (
@@ -16,7 +16,7 @@ const Hero = () => {
       </div>
 
       {/* Overlay */}
-      <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/40 to-black/80 z-10" />
+      <div className="absolute inset-0 bg-linear-to-b from-black/60 via-black/40 to-black/80 z-10" />
 
       {/* Content */}
       <div className="relative z-20 max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
@@ -36,19 +36,14 @@ const Hero = () => {
         </p>
 
         <div className="flex flex-col sm:flex-row gap-4 justify-center mb-12">
-          <Button
-            size="lg"
-            className="bg-white text-black hover:bg-gray-100 text-base font-semibold"
-          >
-            Launch App <ArrowRight className="ml-2 w-5 h-5" />
-          </Button>
-          <Button
-            size="lg"
-            variant="outline"
-            className="border-white/30 text-white hover:bg-white/10 text-base font-semibold bg-transparent"
-          >
-            Learn More
-          </Button>
+          <a href="/register">
+            <Button>
+              Launch App <ArrowRight className="ml-2 w-5 h-5" />
+            </Button>
+          </a>
+          <a href="#features">
+            <Button variant="outline">Learn More</Button>
+          </a>
         </div>
 
         <div className="flex flex-col sm:flex-row items-center justify-center gap-8 text-sm text-gray-300">
