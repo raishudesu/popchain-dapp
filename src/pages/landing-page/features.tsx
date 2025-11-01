@@ -1,4 +1,4 @@
-import SpotlightCard from "../SpotlightCard";
+import SpotlightCard from "../../components/SpotlightCard";
 import { features } from "./data";
 
 const Features = () => {

@@ -1,6 +1,6 @@
 import { ArrowRight, CheckCircle2, Shield, Zap } from "lucide-react";
-import { Button } from "../ui/button";
-import Iridescence from "../Iridescence";
+import { Button } from "../../components/ui/button";
+import Iridescence from "../../components/Iridescence";
 
 const Hero = () => {
   return (

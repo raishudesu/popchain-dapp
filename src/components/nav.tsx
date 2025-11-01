@@ -1,5 +1,8 @@
-import { Button } from "../ui/button";
 import { Sparkles } from "lucide-react";
+import { ModeToggle } from "./mode-toggle";
+import { Button, buttonVariants } from "./ui/button";
+import { ConnectButton } from "@mysten/dapp-kit";
+import { cn } from "@/lib/utils";
 
 const Nav = () => {
   return (
@@ -31,9 +34,13 @@ const Nav = () => {
             For Organizers & Attendees
           </a>
         </div>
-        <Button className="bg-white text-black hover:bg-gray-100">
-          Get Started
-        </Button>
+        <div className="flex items-center gap-2 ">
+          <ModeToggle />
+          <Button>Get Started</Button>
+          <ConnectButton
+            className={cn(buttonVariants({ variant: "outline" }))}
+          />
+        </div>
       </div>
     </nav>
   );

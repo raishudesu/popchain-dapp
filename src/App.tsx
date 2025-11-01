@@ -1,24 +1,18 @@
-import "./App.css";
-import Nav from "./components/landing-page/nav";
-import Hero from "./components/landing-page/hero";
-import Features from "./components/landing-page/features";
-import Tiers from "./components/landing-page/tiers";
-import HowItWorks from "./components/landing-page/how-it-works";
-import Benefits from "./components/landing-page/benefits";
-import Cta from "./components/landing-page/cta";
-import Footer from "./components/footer";
+import { Routes, Route } from "react-router";
+import Layout from "./components/layout";
+import LandingPage from "./pages/landing-page";
+import LoginPage from "./pages/login";
+import RegisterPage from "./pages/register";
+import "@/styles/App.css";
 
-export default function Home() {
+export default function App() {
   return (
-    <div className="min-h-screen bg-background text-foreground overflow-hidden">
-      <Nav />
-      <Hero />
-      <Features />
-      <Tiers />
-      <HowItWorks />
-      <Benefits />
-      <Cta />
-      <Footer />
-    </div>
+    <Routes>
+      <Route element={<Layout />}>
+        <Route path="/" element={<LandingPage />} />
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/register" element={<RegisterPage />} />
+      </Route>
+    </Routes>
   );
 }
