@@ -23,8 +23,8 @@ export function StepIndicator({ steps, currentStep }: StepIndicatorProps) {
               className={cn(
                 "w-12 h-12 rounded-full flex items-center justify-center font-semibold text-sm transition-all duration-300",
                 currentStep >= step.id
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-muted text-muted-foreground border-2 border-border",
+                  ? "bg-gradient-to-r from-purple-400 to-pink-600 text-white"
+                  : "bg-muted text-muted-foreground border-2 border-border"
               )}
             >
               {currentStep > step.id ? <Check className="w-5 h-5" /> : step.id}
@@ -44,7 +44,9 @@ export function StepIndicator({ steps, currentStep }: StepIndicatorProps) {
             <div
               className={cn(
                 "flex-1 h-1 mx-3 transition-all duration-300",
-                currentStep > step.id ? "bg-primary" : "bg-muted",
+                currentStep > step.id
+                  ? "bg-gradient-to-r from-purple-400 to-pink-600"
+                  : "bg-muted"
               )}
             />
           )}

@@ -24,9 +24,7 @@ const Cta = () => {
             onChange={(e) => setEmail(e.target.value)}
             className="w-full max-w-sm"
           />
-          <Button className="bg-linear-to-r from-purple-400 to-pink-600 text-white hover:from-purple-500 hover:to-pink-700 font-semibold">
-            Get Early Access
-          </Button>
+          <Button className="btn-gradient">Get Early Access</Button>
         </div>
       </div>
     </section>

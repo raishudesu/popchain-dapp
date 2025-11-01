@@ -17,11 +17,18 @@ const Tiers = () => {
     "bg-pink-500/20 text-pink-400",
   ];
 
+  const tierImages = [
+    "/tiers/pop_pass.png",
+    "/tiers/pop_badge.png",
+    "/tiers/pop_medal.png",
+    "/tiers/pop_trophy.png",
+  ];
+
   return (
-    <section id="tiers" className="py-20 px-4 sm:px-6 lg:px-8 bg-black">
+    <section id="tiers" className="py-20 px-4 sm:px-6 lg:px-8">
       <div className="max-w-6xl mx-auto">
         <div className="text-center mb-16">
-          <h2 className="text-4xl sm:text-5xl font-bold text-white mb-4">
+          <h2 className="text-4xl sm:text-5xl font-bold mb-4">
             Tiered NFT System
           </h2>
           <p className="text-xl text-gray-400">
@@ -31,7 +38,6 @@ const Tiers = () => {
 
         <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
           {tiers.map((tier, idx) => {
-            const IconComponent = tier.icon;
             return (
               <SpotlightCard
                 key={idx}
@@ -39,19 +45,19 @@ const Tiers = () => {
                 spotlightColor={spotlightColors[idx]}
               >
                 <div className="flex flex-col items-center justify-center">
-                  <div
-                    className={`${tier.iconColor} mb-4 group-hover:scale-110 transition inline-block`}
-                  >
-                    <IconComponent className="w-12 h-12" />
+                  <div className="mb-4 group-hover:scale-110 transition inline-block">
+                    <img
+                      src={tierImages[idx]}
+                      alt={tier.title}
+                      className="w-24 h-24 object-contain"
+                    />
                   </div>
                   <div
                     className={`inline-block px-3 py-1 mb-3 rounded-full ${tierBadgeColors[idx]} text-xs font-semibold`}
                   >
                     {tier.tier}
                   </div>
-                  <h3 className="text-2xl font-bold text-white mb-2">
-                    {tier.title}
-                  </h3>
+                  <h3 className="text-2xl font-bold mb-2">{tier.title}</h3>
                   <p className="text-gray-400">{tier.description}</p>
                 </div>
               </SpotlightCard>

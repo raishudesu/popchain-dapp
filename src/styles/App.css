@@ -127,3 +127,13 @@
   font-weight: 200;
   font-style: normal;
 }
+
+@layer utilities {
+  .btn-gradient {
+    @apply bg-gradient-to-r from-purple-400 to-pink-600 text-white font-semibold;
+  }
+
+  .btn-gradient:hover {
+    @apply from-purple-500 to-pink-700;
+  }
+}
