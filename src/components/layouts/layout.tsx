@@ -1,8 +1,8 @@
 import { Outlet } from "react-router";
 import Footer from "@/components/footer";
-import Nav from "./nav";
+import Nav from "../nav";
 
-const Layout = () => {
+const PublicLayout = () => {
   return (
     <div className="min-h-screen bg-background text-foreground overflow-hidden">
       <Nav />
@@ -12,4 +12,4 @@ const Layout = () => {
   );
 };
 
-export default Layout;
+export default PublicLayout;
