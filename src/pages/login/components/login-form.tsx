@@ -41,9 +41,14 @@ export function LoginForm() {
         className="w-full max-w-screen-sm"
       >
         <Card className="shadow-xl">
-          <div className="p-8">
+          <div className="px-8 pb-4">
             {/* Header */}
-            <div className="mb-8">
+            <div className="flex flex-col mb-8">
+              <img
+                src={"/logos/popchain_logo.png"}
+                alt="popchain-logo"
+                className="mb-2 w-24 h-24 object-contain self-center"
+              />
               <h1 className="text-3xl font-bold text-foreground mb-2">
                 Welcome Back! 🎉
               </h1>
