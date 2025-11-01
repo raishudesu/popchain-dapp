@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, type Path } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -35,9 +35,16 @@ export function RegistrationStepper() {
     },
   });
 
-  const handleNext = async () => {
+  const handleNext = async (e?: React.MouseEvent) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+
     const fieldsToValidate = getFieldsForStep(currentStep);
-    const isValid = await form.trigger(fieldsToValidate as any);
+    const isValid = await form.trigger(
+      fieldsToValidate as Path<RegistrationFormData>[]
+    );
 
     if (isValid && currentStep < STEPS.length) {
       setCurrentStep(currentStep + 1);
@@ -76,11 +83,24 @@ export function RegistrationStepper() {
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(handleSubmit)}>
-        <Card className="w-full max-w-2xl shadow-xl">
-          <div className="p-8">
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (currentStep === STEPS.length) {
+            form.handleSubmit(handleSubmit)(e);
+          }
+        }}
+        className="w-full max-w-screen-sm"
+      >
+        <Card className="shadow-xl">
+          <div className="px-8 pb-4">
             {/* Header */}
-            <div className="mb-8">
+            <div className="flex flex-col mb-8">
+              <img
+                src={"/logos/popchain_logo.png"}
+                alt="popchain-logo"
+                className="mb-2 w-24 h-24 object-contain self-center"
+              />
               <h1 className="text-3xl font-bold text-foreground mb-2">
                 Create Account
               </h1>
@@ -116,15 +136,12 @@ export function RegistrationStepper() {
                   type="button"
                   onClick={handleNext}
                   disabled={!isStepValid()}
-                  className="flex-1"
+                  className="flex-1 btn-gradient"
                 >
                   Next
                 </Button>
               ) : (
-                <Button
-                  type="submit"
-                  className="flex-1 bg-primary hover:bg-primary/90"
-                >
+                <Button type="submit" className="flex-1 btn-gradient">
                   Complete Registration
                 </Button>
               )}
@@ -133,6 +150,14 @@ export function RegistrationStepper() {
             {/* Progress Text */}
             <div className="mt-4 text-center text-sm text-muted-foreground">
               Step {currentStep} of {STEPS.length}
+            </div>
+            <div className="text-center mt-4">
+              <a
+                href="/login"
+                className="text-sm text-blue-500 hover:underline"
+              >
+                Already have an account? Login
+              </a>
             </div>
           </div>
         </Card>

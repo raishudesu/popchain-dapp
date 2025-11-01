@@ -4,7 +4,10 @@ import { ArrowRight, CheckCircle2, Shield, Zap } from "lucide-react";
 
 const Hero = () => {
   return (
-    <section className="relative h-screen flex items-center justify-center overflow-hidden pt-20">
+    <section
+      id="home"
+      className="relative h-screen flex items-center justify-center overflow-hidden pt-20"
+    >
       {/* Background */}
       <div className="absolute inset-0 z-0">
         <Iridescence
@@ -37,8 +40,8 @@ const Hero = () => {
 
         <div className="flex flex-col sm:flex-row gap-4 justify-center mb-12">
           <a href="/register">
-            <Button>
-              Launch App <ArrowRight className="ml-2 w-5 h-5" />
+            <Button className="btn-gradient">
+              Mint your moment <ArrowRight className="ml-2 w-5 h-5" />
             </Button>
           </a>
           <a href="#features">

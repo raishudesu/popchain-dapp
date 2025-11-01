@@ -6,7 +6,7 @@ const Cta = () => {
   const [email, setEmail] = useState("");
 
   return (
-    <section className="py-20 px-4 sm:px-6 lg:px-8 bg-linear-to-b from-black to-gray-950">
+    <section className="py-20 px-4 sm:px-6 lg:px-8 bg-black">
       <div className="max-w-4xl mx-auto text-center">
         <h2 className="text-4xl sm:text-5xl font-bold text-white mb-6">
           Ready to Mint Your Moments?
@@ -24,9 +24,7 @@ const Cta = () => {
             onChange={(e) => setEmail(e.target.value)}
             className="w-full max-w-sm"
           />
-          <Button className="bg-linear-to-r from-purple-400 to-pink-600 text-white hover:from-purple-500 hover:to-pink-700 font-semibold">
-            Get Early Access
-          </Button>
+          <Button className="btn-gradient">Get Early Access</Button>
         </div>
       </div>
     </section>

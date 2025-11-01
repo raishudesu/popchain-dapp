@@ -1,17 +1,32 @@
 import { Routes, Route } from "react-router";
-import Layout from "./components/layout";
+import PublicLayout from "./components/layouts/public-layout";
 import LandingPage from "./pages/landing-page";
 import LoginPage from "./pages/login";
 import RegisterPage from "./pages/register";
 import "@/styles/App.css";
+import AdminLayout from "./pages/admin/components/admin-layout";
+import AdminDashboard from "./pages/admin/dashboard";
+import AttendeeLayout from "./pages/attendee/components/attendee-layout";
+import AttendeeDashboard from "./pages/attendee/dashboard";
+import OrganizerLayout from "./pages/organizer/components/organizer-layout";
+import OrganizerDashboard from "./pages/organizer/dashboard";
 
 export default function App() {
   return (
     <Routes>
-      <Route element={<Layout />}>
+      <Route element={<PublicLayout />}>
         <Route path="/" element={<LandingPage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
+      </Route>
+      <Route element={<AdminLayout />}>
+        <Route path="/admin/dashboard" element={<AdminDashboard />} />
+      </Route>
+      <Route element={<AttendeeLayout />}>
+        <Route path="/attendee/dashboard" element={<AttendeeDashboard />} />
+      </Route>
+      <Route element={<OrganizerLayout />}>
+        <Route path="/organizer/dashboard" element={<OrganizerDashboard />} />
       </Route>
     </Routes>
   );

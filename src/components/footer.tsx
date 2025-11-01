@@ -5,7 +5,11 @@ const Footer = () => {
         <div className="grid md:grid-cols-4 gap-8 mb-8">
           <div>
             <div className="flex items-center gap-2 mb-4">
-              <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-purple-400 to-pink-600" />
+              <img
+                src={"/logos/popchain_logo.png"}
+                alt="popchain-logo"
+                className="w-12 h-12 object-contain"
+              />
               <span className="font-bold text-white">PopChain</span>
             </div>
             <p className="text-sm text-gray-400">Proof of Presence On-Chain</p>

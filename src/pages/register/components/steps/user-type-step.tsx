@@ -13,89 +13,105 @@ import type { RegistrationFormData } from "@/types/registration";
 
 export function UserTypeStep() {
   const form = useFormContext<RegistrationFormData>();
-  const userType = form.watch("userType");
 
   return (
     <FormField
       control={form.control}
       name="userType"
-      render={({ field }) => (
-        <FormItem>
-          <FormLabel className="text-base font-medium">
-            What best describes you?
-          </FormLabel>
-          <FormControl>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {/* Attendee Option */}
-              <Button
-                type="button"
-                onClick={() => field.onChange("attendee")}
-                className={cn(
-                  "p-6 rounded-lg border-2 transition-all duration-200 text-left hover:border-primary hover:bg-muted/50",
-                  userType === "attendee"
-                    ? "border-primary bg-primary/5"
-                    : "border-border",
-                )}
-              >
-                <div className="flex items-start gap-4">
-                  <div
-                    className={cn(
-                      "p-3 rounded-full",
-                      userType === "attendee"
-                        ? "bg-primary text-primary-foreground"
-                        : "bg-muted text-muted-foreground",
-                    )}
-                  >
-                    <Users className="w-6 h-6" />
+      render={({ field }) => {
+        const userType = field.value;
+        return (
+          <FormItem>
+            <FormLabel className="text-base font-medium">
+              What best describes you?
+            </FormLabel>
+            <FormControl>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* Attendee Option */}
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    field.onChange("attendee");
+                  }}
+                  className={cn(
+                    "h-auto p-6 rounded-lg border-2 transition-all duration-200 text-left justify-start",
+                    "hover:bg-accent hover:border-accent-foreground/20",
+                    "whitespace-normal min-w-0",
+                    userType === "attendee"
+                      ? "bg-gradient-to-r from-purple-400/10 to-pink-600/10 border-purple-400/50"
+                      : "border-border bg-card"
+                  )}
+                >
+                  <div className="flex flex-col items-start gap-4 w-full min-w-0">
+                    <div
+                      className={cn(
+                        "p-3 rounded-full transition-colors shrink-0",
+                        userType === "attendee"
+                          ? "bg-gradient-to-r from-purple-400 to-pink-600 text-white"
+                          : "bg-muted text-muted-foreground"
+                      )}
+                    >
+                      <Users className="w-6 h-6" />
+                    </div>
+                    <div className="flex-1 w-full min-w-0">
+                      <h3 className="font-semibold text-foreground mb-1">
+                        Attendee
+                      </h3>
+                      <p className="text-sm text-muted-foreground break-words">
+                        Join events and discover new experiences
+                      </p>
+                    </div>
                   </div>
-                  <div className="flex-1">
-                    <h3 className="font-semibold text-foreground mb-1">
-                      Attendee
-                    </h3>
-                    <p className="text-sm text-muted-foreground">
-                      Join events and discover new experiences
-                    </p>
-                  </div>
-                </div>
-              </Button>
+                </Button>
 
-              {/* Organizer Option */}
-              <Button
-                type="button"
-                onClick={() => field.onChange("organizer")}
-                className={cn(
-                  "p-6 rounded-lg border-2 transition-all duration-200 text-left hover:border-primary hover:bg-muted/50",
-                  userType === "organizer"
-                    ? "border-primary bg-primary/5"
-                    : "border-border",
-                )}
-              >
-                <div className="flex items-start gap-4">
-                  <div
-                    className={cn(
-                      "p-3 rounded-full",
-                      userType === "organizer"
-                        ? "bg-primary text-primary-foreground"
-                        : "bg-muted text-muted-foreground",
-                    )}
-                  >
-                    <Clipboard className="w-6 h-6" />
+                {/* Organizer Option */}
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    field.onChange("organizer");
+                  }}
+                  className={cn(
+                    "h-auto p-6 rounded-lg border-2 transition-all duration-200 text-left justify-start",
+                    "hover:bg-accent hover:border-accent-foreground/20",
+                    "whitespace-normal min-w-0",
+                    userType === "organizer"
+                      ? "bg-gradient-to-r from-purple-400/10 to-pink-600/10 border-purple-400/50"
+                      : "border-border bg-card"
+                  )}
+                >
+                  <div className="flex flex-col items-start gap-4 w-full min-w-0">
+                    <div
+                      className={cn(
+                        "p-3 rounded-full transition-colors shrink-0",
+                        userType === "organizer"
+                          ? "bg-gradient-to-r from-purple-400 to-pink-600 text-white"
+                          : "bg-muted text-muted-foreground"
+                      )}
+                    >
+                      <Clipboard className="w-6 h-6" />
+                    </div>
+                    <div className="flex-1 w-full min-w-0">
+                      <h3 className="font-semibold text-foreground mb-1">
+                        Organizer
+                      </h3>
+                      <p className="text-sm text-muted-foreground break-words">
+                        Create and manage your own events
+                      </p>
+                    </div>
                   </div>
-                  <div className="flex-1">
-                    <h3 className="font-semibold text-foreground mb-1">
-                      Organizer
-                    </h3>
-                    <p className="text-sm text-muted-foreground">
-                      Create and manage your own events
-                    </p>
-                  </div>
-                </div>
-              </Button>
-            </div>
-          </FormControl>
-          <FormMessage />
-        </FormItem>
-      )}
+                </Button>
+              </div>
+            </FormControl>
+            <FormMessage />
+          </FormItem>
+        );
+      }}
     />
   );
 }
