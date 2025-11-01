@@ -10,6 +10,7 @@ import AttendeeLayout from "./pages/attendee/components/attendee-layout";
 import AttendeeDashboard from "./pages/attendee/dashboard";
 import OrganizerLayout from "./pages/organizer/components/organizer-layout";
 import OrganizerDashboard from "./pages/organizer/dashboard";
+import ScanQrPage from "./pages/scan-qr";
 
 export default function App() {
   return (
@@ -28,6 +29,10 @@ export default function App() {
       <Route element={<OrganizerLayout />}>
         <Route path="/organizer/dashboard" element={<OrganizerDashboard />} />
       </Route>
+
+      {/* <Route path="*" element={<NotFound />} /> */}
+
+      <Route path="/scan-qr/:certId" element={<ScanQrPage />} />
     </Routes>
   );
 }
