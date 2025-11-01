@@ -19,7 +19,7 @@ const Features = () => {
             <SpotlightCard
               key={idx}
               className="custom-spotlight-card"
-              spotlightColor="rgba(0, 229, 255, 0.2)"
+              spotlightColor="rgba(236, 72, 153, 0.2)"
             >
               <div>
                 <div className="text-purple-400 mb-4 group-hover:scale-110 transition">

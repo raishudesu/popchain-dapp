@@ -32,7 +32,7 @@ const Benefits = () => {
           <img
             src={certImage}
             alt="certificate-sample/"
-            className="rounded-xl shadow"
+            className="rounded-xl shadow-2xl"
           />
         </div>
       </div>

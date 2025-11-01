@@ -16,7 +16,7 @@ const HowItWorks = () => {
           {howItWorks.map((item, idx) => (
             <SpotlightCard
               className="custom-spotlight-card"
-              spotlightColor="rgba(0, 229, 255, 0.2)"
+              spotlightColor="rgba(236, 72, 153, 0.2)"
             >
               <div key={idx} className="relative text-center">
                 <div className="w-12 h-12 rounded-full bg-gradient-to-br from-purple-400 to-pink-600 flex items-center justify-center mx-auto mb-4 text-white font-bold text-lg">

@@ -6,15 +6,15 @@ const Tiers = () => {
     [
       "rgba(139, 92, 246, 0.2)", // Purple for PopPass
       "rgba(59, 130, 246, 0.2)", // Blue for PopBadge
-      "rgba(251, 191, 36, 0.2)", // Gold for PopMedal
-      "rgba(236, 72, 153, 0.2)", // Pink for PopTrophy
+      "rgba(236, 72, 153, 0.2)", // Pink for PopMedal
+      "rgba(251, 191, 36, 0.2)", // Gold for PopTrophy
     ];
 
   const tierBadgeColors = [
     "bg-purple-500/20 text-purple-400",
     "bg-blue-500/20 text-blue-400",
-    "bg-yellow-500/20 text-yellow-400",
     "bg-pink-500/20 text-pink-400",
+    "bg-yellow-500/20 text-yellow-400",
   ];
 
   const tierImages = [

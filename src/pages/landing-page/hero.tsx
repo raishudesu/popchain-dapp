@@ -41,7 +41,7 @@ const Hero = () => {
         <div className="flex flex-col sm:flex-row gap-4 justify-center mb-12">
           <a href="/register">
             <Button className="btn-gradient">
-              Launch App <ArrowRight className="ml-2 w-5 h-5" />
+              Mint your moment <ArrowRight className="ml-2 w-5 h-5" />
             </Button>
           </a>
           <a href="#features">
