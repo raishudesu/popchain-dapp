@@ -11,28 +11,32 @@ import AttendeeDashboard from "./pages/attendee/dashboard";
 import OrganizerLayout from "./pages/organizer/components/organizer-layout";
 import OrganizerDashboard from "./pages/organizer/dashboard";
 import ScanQrPage from "./pages/scan-qr";
+import { Toaster } from "./components/ui/sonner";
 
 export default function App() {
   return (
-    <Routes>
-      <Route element={<PublicLayout />}>
-        <Route path="/" element={<LandingPage />} />
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/register" element={<RegisterPage />} />
-      </Route>
-      <Route element={<AdminLayout />}>
-        <Route path="/admin/dashboard" element={<AdminDashboard />} />
-      </Route>
-      <Route element={<AttendeeLayout />}>
-        <Route path="/attendee/dashboard" element={<AttendeeDashboard />} />
-      </Route>
-      <Route element={<OrganizerLayout />}>
-        <Route path="/organizer/dashboard" element={<OrganizerDashboard />} />
-      </Route>
+    <>
+      <Routes>
+        <Route element={<PublicLayout />}>
+          <Route path="/" element={<LandingPage />} />
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/register" element={<RegisterPage />} />
+        </Route>
+        <Route element={<AdminLayout />}>
+          <Route path="/admin/dashboard" element={<AdminDashboard />} />
+        </Route>
+        <Route element={<AttendeeLayout />}>
+          <Route path="/attendee/dashboard" element={<AttendeeDashboard />} />
+        </Route>
+        <Route element={<OrganizerLayout />}>
+          <Route path="/organizer/dashboard" element={<OrganizerDashboard />} />
+        </Route>
 
-      {/* <Route path="*" element={<NotFound />} /> */}
+        {/* <Route path="*" element={<NotFound />} /> */}
 
-      <Route path="/scan-qr/:certId" element={<ScanQrPage />} />
-    </Routes>
+        <Route path="/scan-qr/:certId" element={<ScanQrPage />} />
+      </Routes>
+      <Toaster />
+    </>
   );
 }

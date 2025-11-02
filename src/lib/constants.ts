@@ -1,7 +1,7 @@
 // ============ Contract Configuration ============
 // TODO: Replace with actual package ID after contract deployment
 export const CONTRACT_PACKAGE_ID =
-  "0x0000000000000000000000000000000000000000000000000000000000000000";
+  "0xfb540197178a08a24a062c1497a81bd0ce022bef43b6b643499f9cb3c0ba9fbd";
 
 // ============ Module Names ============
 export const MODULE_NAMES = {

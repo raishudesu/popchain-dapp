@@ -1,6 +1,11 @@
 import { useState } from "react";
 import { useForm, type Path } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import {
+  useCurrentWallet,
+  useSignAndExecuteTransaction,
+  useSuiClient,
+} from "@mysten/dapp-kit";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Form } from "@/components/ui/form";
@@ -11,6 +16,12 @@ import { UserTypeStep } from "./steps/user-type-step";
 import { ReviewStep } from "./steps/review-step";
 import { registrationSchema } from "@/schemas/registration";
 import type { RegistrationFormData } from "@/types/registration";
+import { registerUser } from "@/services/registration";
+import { createAccountTransaction, extractAccountId } from "@/services/onchain";
+import { requestSponsoredAccountCreation } from "@/services/sponsored-transaction";
+import { useNavigate } from "react-router";
+import { toast } from "sonner";
+import { Spinner } from "@/components/ui/spinner";
 
 const STEPS = [
   { id: 1, title: "Personal Info", description: "Tell us about yourself" },
@@ -21,6 +32,11 @@ const STEPS = [
 
 export function RegistrationStepper() {
   const [currentStep, setCurrentStep] = useState(1);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const { currentWallet, isConnected } = useCurrentWallet();
+  const { mutateAsync: signAndExecute } = useSignAndExecuteTransaction();
+  const suiClient = useSuiClient();
+  const navigate = useNavigate();
 
   const form = useForm<RegistrationFormData>({
     resolver: zodResolver(registrationSchema),
@@ -57,10 +73,189 @@ export function RegistrationStepper() {
     }
   };
 
-  const handleSubmit = (data: RegistrationFormData) => {
-    console.log("Form submitted:", data);
-    // Handle form submission here
-    alert("Registration successful! Check console for details.");
+  const handleSubmit = async (data: RegistrationFormData) => {
+    setIsSubmitting(true);
+
+    try {
+      const walletAddress = currentWallet?.accounts[0]?.address || null;
+
+      // For organizers, wallet connection is required
+      if (data.userType === "organizer" && (!isConnected || !walletAddress)) {
+        toast.error("Please connect your wallet to register as an organizer.");
+        setIsSubmitting(false);
+        return;
+      }
+
+      let accountId: string | null = null;
+
+      // Step 1: Create on-chain PopChain account
+      if (isConnected && walletAddress) {
+        // User has wallet - execute transaction directly
+        toast.loading("Creating your on-chain account...");
+
+        const tx = createAccountTransaction(
+          data.email,
+          data.userType,
+          walletAddress
+        );
+
+        signAndExecute(
+          {
+            transaction: tx,
+          },
+          {
+            onSuccess: async ({ digest }) => {
+              try {
+                console.log("Transaction digest:", digest);
+
+                // Wait for transaction and get effects (following Mint.md pattern)
+                const { effects } = await suiClient.waitForTransaction({
+                  digest: digest,
+                  options: {
+                    showEffects: true,
+                    showObjectChanges: true,
+                  },
+                });
+
+                console.log("Transaction effects:", effects);
+
+                // Extract account ID from effects (following Mint.md pattern)
+                if (effects?.created?.[0]?.reference?.objectId) {
+                  accountId = effects.created[0].reference.objectId;
+                  console.log(
+                    "Found account ID from effects.created[0].reference.objectId:",
+                    accountId
+                  );
+                } else {
+                  // Fallback to extractAccountId for other structures
+                  accountId = extractAccountId({
+                    effects,
+                    objectChanges: effects,
+                  });
+                  if (accountId) {
+                    console.log(
+                      "Found account ID using extractAccountId:",
+                      accountId
+                    );
+                  }
+                }
+
+                if (!accountId) {
+                  console.error(
+                    "Failed to extract account ID. Effects:",
+                    effects
+                  );
+                  toast.error(
+                    "Failed to get on-chain account address. Please check the console for details and try again."
+                  );
+                  setIsSubmitting(false);
+                  return;
+                }
+
+                console.log("Successfully extracted account ID:", accountId);
+
+                // Step 2: Create Supabase account with the on-chain account address
+                toast.loading("Completing registration...");
+
+                const registrationResult = await registerUser(
+                  data,
+                  walletAddress,
+                  accountId
+                );
+
+                if (registrationResult.success) {
+                  toast.success(
+                    "Registration successful! Please check your email to verify your account."
+                  );
+                  navigate("/login");
+                } else {
+                  toast.error(
+                    registrationResult.error ||
+                      "Registration failed. Please try again."
+                  );
+                }
+              } catch (error) {
+                console.error("Error processing transaction:", error);
+                toast.error(
+                  error instanceof Error && error.message
+                    ? error.message
+                    : "Failed to process registration. Please try again."
+                );
+              } finally {
+                setIsSubmitting(false);
+              }
+            },
+            onError: (error) => {
+              console.error("On-chain account creation error:", error);
+              toast.error(
+                error instanceof Error && error.message
+                  ? error.message
+                  : "Failed to create on-chain account. Please try again."
+              );
+              setIsSubmitting(false);
+            },
+          }
+        );
+
+        // Return early since signAndExecute is async via callbacks
+        return;
+      } else {
+        // No wallet connected - use sponsored transaction (admin pays gas)
+        // This is allowed for attendees
+        if (data.userType === "attendee") {
+          toast.loading("Creating your on-chain account (sponsored)...");
+
+          const sponsoredResult = await requestSponsoredAccountCreation(
+            data.email,
+            data.userType,
+            null // No wallet address for attendees without wallet
+          );
+
+          if (!sponsoredResult.success || !sponsoredResult.accountId) {
+            toast.error(
+              sponsoredResult.error ||
+                "Failed to create sponsored account. Please try again."
+            );
+            setIsSubmitting(false);
+            return;
+          }
+
+          accountId = sponsoredResult.accountId;
+        } else {
+          // Organizers must have wallet
+          toast.error(
+            "Please connect your wallet to register as an organizer."
+          );
+          setIsSubmitting(false);
+          return;
+        }
+      }
+
+      // Step 2: Create Supabase account with the on-chain account address
+      toast.loading("Completing registration...");
+
+      const registrationResult = await registerUser(
+        data,
+        walletAddress,
+        accountId
+      );
+
+      if (registrationResult.success) {
+        toast.success(
+          "Registration successful! Please check your email to verify your account."
+        );
+        navigate("/login");
+      } else {
+        toast.error(
+          registrationResult.error || "Registration failed. Please try again."
+        );
+      }
+    } catch (error) {
+      console.error("Registration error:", error);
+      toast.error("An unexpected error occurred. Please try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const getFieldsForStep = (step: number): (keyof RegistrationFormData)[] => {
@@ -141,8 +336,19 @@ export function RegistrationStepper() {
                   Next
                 </Button>
               ) : (
-                <Button type="submit" className="flex-1 btn-gradient">
-                  Complete Registration
+                <Button
+                  type="submit"
+                  className="flex-1 btn-gradient"
+                  disabled={isSubmitting}
+                >
+                  {isSubmitting ? (
+                    <>
+                      <Spinner />
+                      <span>Registering...</span>
+                    </>
+                  ) : (
+                    "Complete Registration"
+                  )}
                 </Button>
               )}
             </div>
