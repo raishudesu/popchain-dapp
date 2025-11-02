@@ -27,6 +27,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { CustomConnectButton } from "@/components/custom-connect-button";
+import { useAuth } from "@/contexts/auth-context";
+import { useNavigate } from "react-router";
 
 // Menu items.
 const items = [
@@ -58,6 +60,19 @@ const items = [
 ];
 
 export function AdminSidebar() {
+  const { signOut } = useAuth();
+
+  const navigate = useNavigate();
+
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+    } catch (error) {
+      console.error("Error signing out:", error);
+    }
+    navigate("/login");
+  };
+
   return (
     <Sidebar>
       <SidebarContent>
@@ -100,7 +115,7 @@ export function AdminSidebar() {
                 align="start"
                 className="w-[var(--radix-dropdown-menu-trigger-width)]"
               >
-                <DropdownMenuItem>
+                <DropdownMenuItem onClick={handleSignOut}>
                   <LogOut />
                   <span>Sign out</span>
                 </DropdownMenuItem>

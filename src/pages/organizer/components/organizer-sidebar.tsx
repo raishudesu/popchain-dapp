@@ -1,10 +1,7 @@
 import {
-  Calendar,
   ChevronUp,
-  Home,
-  Inbox,
+  LayoutDashboard,
   LogOut,
-  Search,
   Settings,
   User2,
 } from "lucide-react";
@@ -16,6 +13,7 @@ import {
   SidebarGroup,
   SidebarGroupContent,
   SidebarGroupLabel,
+  SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
@@ -27,42 +25,50 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { CustomConnectButton } from "@/components/custom-connect-button";
+import { useAuth } from "@/contexts/auth-context";
+import { useNavigate } from "react-router";
 
 // Menu items.
 const items = [
   {
-    title: "Home",
-    url: "#",
-    icon: Home,
-  },
-  {
-    title: "Inbox",
-    url: "#",
-    icon: Inbox,
-  },
-  {
-    title: "Calendar",
-    url: "#",
-    icon: Calendar,
-  },
-  {
-    title: "Search",
-    url: "#",
-    icon: Search,
+    title: "Dashboard",
+    url: "/organizer/dashboard",
+    icon: LayoutDashboard,
   },
   {
     title: "Settings",
-    url: "#",
+    url: "/organizer/settings",
     icon: Settings,
   },
 ];
 
 export function OrganizerSidebar() {
+  const { signOut, user } = useAuth();
+
+  const navigate = useNavigate();
+
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+    } catch (error) {
+      console.error("Error signing out:", error);
+    }
+    navigate("/login");
+  };
+
   return (
     <Sidebar>
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel>PopChain Admin</SidebarGroupLabel>
+          <SidebarHeader>
+            <img
+              src="/logos/popchain_logo.png"
+              alt="logo"
+              className="w-12 h-12 object-contain"
+            />
+            <SidebarGroupLabel>Organizer Dashboard</SidebarGroupLabel>
+          </SidebarHeader>
+
           <SidebarGroupContent>
             <SidebarMenu>
               {items.map((item) => (
@@ -91,16 +97,15 @@ export function OrganizerSidebar() {
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <SidebarMenuButton>
-                  <User2 /> Username
+                  <User2 /> {user?.email}
                   <ChevronUp className="ml-auto" />
                 </SidebarMenuButton>
               </DropdownMenuTrigger>
               <DropdownMenuContent
-                side="top"
                 align="start"
                 className="w-[var(--radix-dropdown-menu-trigger-width)]"
               >
-                <DropdownMenuItem>
+                <DropdownMenuItem onClick={handleSignOut}>
                   <LogOut />
                   <span>Sign out</span>
                 </DropdownMenuItem>

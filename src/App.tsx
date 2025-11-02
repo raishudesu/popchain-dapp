@@ -12,6 +12,8 @@ import OrganizerLayout from "./pages/organizer/components/organizer-layout";
 import OrganizerDashboard from "./pages/organizer/dashboard";
 import ScanQrPage from "./pages/scan-qr";
 import { Toaster } from "./components/ui/sonner";
+import { ProtectedRoute } from "./components/auth/protected-route";
+import { GuestRoute } from "./components/auth/guest-route";
 
 export default function App() {
   return (
@@ -19,17 +21,28 @@ export default function App() {
       <Routes>
         <Route element={<PublicLayout />}>
           <Route path="/" element={<LandingPage />} />
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/register" element={<RegisterPage />} />
+          <Route element={<GuestRoute />}>
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="/register" element={<RegisterPage />} />
+          </Route>
         </Route>
-        <Route element={<AdminLayout />}>
-          <Route path="/admin/dashboard" element={<AdminDashboard />} />
+        <Route element={<ProtectedRoute requiredRole="admin" />}>
+          <Route element={<AdminLayout />}>
+            <Route path="/admin/dashboard" element={<AdminDashboard />} />
+          </Route>
         </Route>
-        <Route element={<AttendeeLayout />}>
-          <Route path="/attendee/dashboard" element={<AttendeeDashboard />} />
+        <Route element={<ProtectedRoute requiredRole="attendee" />}>
+          <Route element={<AttendeeLayout />}>
+            <Route path="/attendee/dashboard" element={<AttendeeDashboard />} />
+          </Route>
         </Route>
-        <Route element={<OrganizerLayout />}>
-          <Route path="/organizer/dashboard" element={<OrganizerDashboard />} />
+        <Route element={<ProtectedRoute requiredRole="organizer" />}>
+          <Route element={<OrganizerLayout />}>
+            <Route
+              path="/organizer/dashboard"
+              element={<OrganizerDashboard />}
+            />
+          </Route>
         </Route>
 
         {/* <Route path="*" element={<NotFound />} /> */}

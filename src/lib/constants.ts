@@ -3,6 +3,9 @@
 export const CONTRACT_PACKAGE_ID =
   "0xfb540197178a08a24a062c1497a81bd0ce022bef43b6b643499f9cb3c0ba9fbd";
 
+export const PLATFORM_TREASURY_ADDRESS =
+  "0x35b57bd4f8846f85324e570a3540131538831bd07a42b5f10ddddc81d8af5529";
+
 // ============ Module Names ============
 export const MODULE_NAMES = {
   WALLET: "popchain_wallet",

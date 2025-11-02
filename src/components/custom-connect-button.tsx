@@ -53,6 +53,7 @@ export function CustomConnectButton({ className }: CustomConnectButtonProps) {
           </SidebarMenuButton>
         </DropdownMenuTrigger>
         <DropdownMenuContent
+          side="top"
           align="start"
           className="w-[var(--radix-dropdown-menu-trigger-width)]"
         >
