@@ -217,7 +217,11 @@ export function DepositDialog({
               >
                 Cancel
               </Button>
-              <Button type="submit" disabled={isDepositing}>
+              <Button
+                type="submit"
+                disabled={isDepositing}
+                className="btn-gradient"
+              >
                 {isDepositing ? (
                   <>
                     <Spinner className="mr-2 h-4 w-4" />

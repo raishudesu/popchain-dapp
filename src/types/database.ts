@@ -8,6 +8,11 @@ export interface Database {
         Insert: UserProfileInsert;
         Update: UserProfileUpdate;
       };
+      events: {
+        Row: Event;
+        Insert: EventInsert;
+        Update: EventUpdate;
+      };
     };
     Views: {
       [_ in never]: never;
@@ -60,5 +65,36 @@ export interface UserProfileUpdate {
   popchain_account_address?: string | null;
   role?: number;
   certificates?: string[];
+  updated_at?: string;
+}
+
+export interface Event {
+  id: string; // UUID from Supabase
+  event_id: string; // Event object ID from blockchain
+  name: string;
+  description: string;
+  organizer_id: string; // UUID from auth.users
+  organizer_account_address: string; // PopChainAccount object ID
+  active: boolean;
+  created_at: string; // ISO timestamp
+  updated_at: string; // ISO timestamp
+}
+
+export interface EventInsert {
+  event_id: string;
+  name: string;
+  description: string;
+  organizer_id: string;
+  organizer_account_address: string;
+  active?: boolean;
+}
+
+export interface EventUpdate {
+  event_id?: string;
+  name?: string;
+  description?: string;
+  organizer_id?: string;
+  organizer_account_address?: string;
+  active?: boolean;
   updated_at?: string;
 }

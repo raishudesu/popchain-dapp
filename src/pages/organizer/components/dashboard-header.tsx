@@ -82,6 +82,19 @@ export function DashboardHeader() {
                 <p className="text-accent-foreground/60 text-sm">
                   {popChainMist} MIST
                 </p>
+                <div className="mt-4">
+                  {isConnected &&
+                    account &&
+                    profile?.popchain_account_address && (
+                      <DepositDialog
+                        open={depositDialogOpen}
+                        onOpenChange={setDepositDialogOpen}
+                        accountAddress={profile.popchain_account_address}
+                        walletBalance={walletSui}
+                        onDepositSuccess={handleDepositSuccess}
+                      />
+                    )}
+                </div>
               </div>
             )}
 
@@ -113,15 +126,6 @@ export function DashboardHeader() {
             <div className="w-14 h-14 bg-accent-foreground/10 rounded-xl flex items-center justify-center">
               <Wallet className="w-7 h-7 text-accent-foreground" />
             </div>
-            {isConnected && account && profile?.popchain_account_address && (
-              <DepositDialog
-                open={depositDialogOpen}
-                onOpenChange={setDepositDialogOpen}
-                accountAddress={profile.popchain_account_address}
-                walletBalance={walletSui}
-                onDepositSuccess={handleDepositSuccess}
-              />
-            )}
           </div>
         </div>
       </div>
