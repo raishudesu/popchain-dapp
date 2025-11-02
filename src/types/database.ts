@@ -18,6 +18,11 @@ export interface Database {
         Insert: WhitelistingInsert;
         Update: WhitelistingUpdate;
       };
+      certificates: {
+        Row: Certificate;
+        Insert: CertificateInsert;
+        Update: CertificateUpdate;
+      };
     };
     Views: {
       [_ in never]: never;
@@ -122,4 +127,47 @@ export interface WhitelistingUpdate {
   event_id?: string;
   email?: string;
   email_hash?: string;
+}
+
+export interface Certificate {
+  id: string; // UUID from Supabase
+  event_id: string; // Event object ID from blockchain
+  user_id: string; // UUID from auth.users
+  image_url: string; // URL to the certificate image in Supabase storage
+  name: string | null; // Optional name for the certificate
+  is_default: boolean; // Whether this is a default certificate
+  tier_name: string; // Tier name: PopPass, PopBadge, PopMedal, PopTrophy
+  tier_index: number; // Tier index in event's tiers vector: 0=PopPass, 1=PopBadge, 2=PopMedal, 3=PopTrophy
+  tier_level: string | null; // Tier level: Basic, Standard, Premium, Exclusive
+  tier_description: string | null; // Tier description
+  tier_image_url: string | null; // URL to tier image
+  created_at: string; // ISO timestamp
+  updated_at: string; // ISO timestamp
+}
+
+export interface CertificateInsert {
+  event_id: string;
+  user_id: string;
+  image_url: string;
+  name?: string | null;
+  is_default?: boolean;
+  tier_name: string;
+  tier_index: number; // Tier index: 0=PopPass, 1=PopBadge, 2=PopMedal, 3=PopTrophy
+  tier_level?: string | null;
+  tier_description?: string | null;
+  tier_image_url?: string | null;
+}
+
+export interface CertificateUpdate {
+  event_id?: string;
+  user_id?: string;
+  image_url?: string;
+  name?: string | null;
+  is_default?: boolean;
+  tier_name?: string;
+  tier_index?: number;
+  tier_level?: string | null;
+  tier_description?: string | null;
+  tier_image_url?: string | null;
+  updated_at?: string;
 }

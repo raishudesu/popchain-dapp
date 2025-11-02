@@ -25,7 +25,7 @@ function getUserRole(userType: "organizer" | "attendee"): number {
  *
  * @returns Keypair or null if not configured
  */
-function getServiceWallet(): Ed25519Keypair | null {
+export function getServiceWallet(): Ed25519Keypair | null {
   const privateKeyEnv = import.meta.env.VITE_SERVICE_WALLET_PRIVATE_KEY;
   const passphraseEnv = import.meta.env.VITE_SERVICE_WALLET_PASSPHRASE;
 
@@ -243,7 +243,7 @@ function getServiceWallet(): Ed25519Keypair | null {
  * Get SuiClient for the current network
  * Uses the same network config as the app
  */
-function getSuiClient(): SuiClient {
+export function getSuiClient(): SuiClient {
   // Get network from environment or default to testnet (matching main.tsx defaultNetwork)
   const network =
     (import.meta.env.VITE_SUI_NETWORK as "testnet" | "mainnet" | "devnet") ||

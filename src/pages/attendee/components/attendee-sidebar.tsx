@@ -27,6 +27,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { CustomConnectButton } from "@/components/custom-connect-button";
+import { useAuth } from "@/contexts/auth-context";
 
 // Menu items.
 const items = [
@@ -58,6 +59,8 @@ const items = [
 ];
 
 export function AttendeeSidebar() {
+  const { signOut } = useAuth();
+
   return (
     <Sidebar>
       <SidebarContent>
@@ -98,7 +101,11 @@ export function AttendeeSidebar() {
                 align="start"
                 className="w-[var(--radix-dropdown-menu-trigger-width)]"
               >
-                <DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => {
+                    signOut();
+                  }}
+                >
                   <LogOut />
                   <span>Sign out</span>
                 </DropdownMenuItem>

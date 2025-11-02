@@ -270,8 +270,12 @@ export async function fetchEventById(eventId: string): Promise<Event | null> {
     .single();
 
   if (error) {
+    if (error.code === "PGRST116") {
+      // Not found - return null instead of throwing
+      return null;
+    }
     console.error("Error fetching event:", error);
-    return null;
+    throw new Error(`Failed to fetch event: ${error.message}`);
   }
 
   return data as Event;
