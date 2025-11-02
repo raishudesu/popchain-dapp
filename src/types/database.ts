@@ -13,6 +13,11 @@ export interface Database {
         Insert: EventInsert;
         Update: EventUpdate;
       };
+      whitelistings: {
+        Row: Whitelisting;
+        Insert: WhitelistingInsert;
+        Update: WhitelistingUpdate;
+      };
     };
     Views: {
       [_ in never]: never;
@@ -97,4 +102,24 @@ export interface EventUpdate {
   organizer_account_address?: string;
   active?: boolean;
   updated_at?: string;
+}
+
+export interface Whitelisting {
+  id: string; // UUID from Supabase
+  event_id: string; // Event object ID from blockchain
+  email: string;
+  email_hash: string; // SHA-3-256 hash (hex string)
+  created_at: string; // ISO timestamp
+}
+
+export interface WhitelistingInsert {
+  event_id: string;
+  email: string;
+  email_hash: string;
+}
+
+export interface WhitelistingUpdate {
+  event_id?: string;
+  email?: string;
+  email_hash?: string;
 }

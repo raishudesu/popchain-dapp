@@ -2,7 +2,8 @@ import type { SuiClient } from "@mysten/sui/client";
 import { Transaction } from "@mysten/sui/transactions";
 import { FUNCTION_PATHS, PLATFORM_TREASURY_ADDRESS } from "@/lib/constants";
 import supabase from "@/utils/supabase";
-import type { Event } from "@/types/database";
+import type { Event, WhitelistingInsert } from "@/types/database";
+import { hashEmail, hashEmailToBytes } from "@/utils/hash";
 
 /**
  * Create a transaction to create an event with default tiers
@@ -32,15 +33,15 @@ export function createEventTransaction(
 }
 
 /**
- * Fetch events for a specific organizer from Supabase
+ * Fetch events for a specific organizer from Supabase with whitelist counts
  * @param organizerId - UUID of the organizer (from auth.users)
- * @returns Array of events
+ * @returns Array of events with whitelistedCount
  */
 export async function fetchOrganizerEvents(
   organizerId: string
-): Promise<Event[]> {
-  const { data, error } = await supabase
-    .from("events")
+): Promise<(Event & { whitelistedCount: number })[]> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: events, error } = await (supabase.from("events") as any)
     .select("*")
     .eq("organizer_id", organizerId)
     .order("created_at", { ascending: false });
@@ -50,7 +51,43 @@ export async function fetchOrganizerEvents(
     throw error;
   }
 
-  return data || [];
+  const typedEvents = (events || []) as Event[];
+
+  if (typedEvents.length === 0) {
+    return [];
+  }
+
+  // Fetch whitelist counts for all events
+  const eventIds = typedEvents.map((event) => event.event_id);
+  const { data: whitelistings, error: whitelistError } =
+    await // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (supabase.from("whitelistings") as any)
+      .select("event_id")
+      .in("event_id", eventIds);
+
+  if (whitelistError) {
+    console.error("Error fetching whitelistings:", whitelistError);
+    // Return events with 0 count if whitelistings fetch fails
+    return typedEvents.map((event) => ({
+      ...event,
+      whitelistedCount: 0,
+    }));
+  }
+
+  // Count whitelistings per event
+  const countsByEventId = new Map<string, number>();
+  if (whitelistings && Array.isArray(whitelistings)) {
+    for (const whitelisting of whitelistings as Array<{ event_id: string }>) {
+      const currentCount = countsByEventId.get(whitelisting.event_id) || 0;
+      countsByEventId.set(whitelisting.event_id, currentCount + 1);
+    }
+  }
+
+  // Combine events with their counts
+  return typedEvents.map((event) => ({
+    ...event,
+    whitelistedCount: countsByEventId.get(event.event_id) || 0,
+  }));
 }
 
 /**
@@ -138,5 +175,82 @@ export async function getEventFromBlockchain(
   } catch (error) {
     console.error("Error fetching event from blockchain:", error);
     return null;
+  }
+}
+
+/**
+ * Create a transaction to add an email to event whitelist
+ * @param eventId - Event object ID from blockchain
+ * @param email - Email address to whitelist
+ * @returns Transaction object
+ */
+export function createAddToWhitelistTransaction(
+  eventId: string,
+  email: string
+): Transaction {
+  const tx = new Transaction();
+  const emailHashBytes = hashEmailToBytes(email);
+
+  tx.moveCall({
+    target: FUNCTION_PATHS.EVENT_ADD_TO_WHITELIST,
+    arguments: [
+      tx.object(eventId), // &mut Event
+      tx.pure.vector("u8", emailHashBytes), // vector<u8> email_hash
+    ],
+  });
+
+  return tx;
+}
+
+/**
+ * Whitelist a single email address for an event
+ * @param eventId - Event object ID from blockchain
+ * @param email - Email address to whitelist
+ * @param suiClient - SuiClient instance
+ * @param signAndExecute - Function to sign and execute transaction
+ * @returns Success status and transaction digest
+ */
+// THIS SHOULD BE A BULK WHITELISTING FUNCTION NEXT TIME :) - barysh
+export async function whitelistEmail(
+  eventId: string,
+  email: string,
+  suiClient: SuiClient,
+  signAndExecute: (params: {
+    transaction: Transaction;
+  }) => Promise<{ digest: string }>
+): Promise<{ success: boolean; digest?: string; error?: string }> {
+  try {
+    const tx = createAddToWhitelistTransaction(eventId, email);
+    const result = await signAndExecute({ transaction: tx });
+
+    // Wait for transaction
+    await suiClient.waitForTransaction({
+      digest: result.digest,
+    });
+
+    // Store in Supabase
+    const emailHash = hashEmail(email);
+    const whitelistingData: WhitelistingInsert = {
+      event_id: eventId,
+      email,
+      email_hash: emailHash,
+    };
+
+    const { error: dbError } =
+      await // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (supabase.from("whitelistings") as any).insert(whitelistingData);
+
+    if (dbError) {
+      console.error("Error storing whitelisting in database:", dbError);
+      // Still return success since on-chain whitelisting succeeded
+    }
+
+    return { success: true, digest: result.digest };
+  } catch (error) {
+    console.error("Error whitelisting email:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Unknown error",
+    };
   }
 }

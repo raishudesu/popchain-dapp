@@ -10,6 +10,7 @@ import AttendeeLayout from "./pages/attendee/components/attendee-layout";
 import AttendeeDashboard from "./pages/attendee/dashboard";
 import OrganizerLayout from "./pages/organizer/components/organizer-layout";
 import OrganizerDashboard from "./pages/organizer/dashboard";
+import EventDetailsPage from "./pages/organizer/event";
 import ScanQrPage from "./pages/scan-qr";
 import { Toaster } from "./components/ui/sonner";
 import { ProtectedRoute } from "./components/auth/protected-route";
@@ -41,6 +42,10 @@ export default function App() {
             <Route
               path="/organizer/dashboard"
               element={<OrganizerDashboard />}
+            />
+            <Route
+              path="/organizer/event/:eventId"
+              element={<EventDetailsPage />}
             />
           </Route>
         </Route>

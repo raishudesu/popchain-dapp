@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useNavigate } from "react-router";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { PlusCircle, Users, Loader2, CheckCircle2 } from "lucide-react";
@@ -9,20 +10,19 @@ import { fetchOrganizerEvents } from "@/services/events";
 import { useAuth } from "@/contexts/auth-context";
 import type { Event } from "@/types/database";
 
-interface EventWithWhitelist extends Event {
-  whitelistedCount: number;
-}
+type EventWithWhitelist = Event & { whitelistedCount: number };
 
 export default function Events() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const { user, loading: authLoading } = useAuth();
+  const navigate = useNavigate();
 
-  // Fetch events from Supabase
+  // Fetch events from Supabase with whitelist counts
   const {
-    data: events = [],
+    data: eventsWithCount = [],
     isLoading: eventsLoading,
     refetch,
-  } = useQuery<Event[]>({
+  } = useQuery<EventWithWhitelist[]>({
     queryKey: ["events", user?.id],
     queryFn: () => {
       if (!user?.id) {
@@ -33,13 +33,6 @@ export default function Events() {
     enabled: !!user?.id,
     staleTime: 1000 * 60, // 1 minute
   });
-
-  // Transform events to include whitelist count (placeholder for now)
-  // In the future, we can fetch this from blockchain or store it in Supabase
-  const eventsWithCount: EventWithWhitelist[] = events.map((event) => ({
-    ...event,
-    whitelistedCount: 0, // TODO: Fetch from blockchain or store in Supabase
-  }));
 
   return (
     <div className="space-y-6">
@@ -118,12 +111,13 @@ export default function Events() {
                   </div>
                 </div>
 
-                <Badge
+                <Button
                   variant="secondary"
-                  className="w-full justify-center py-2 btn-gradient"
+                  className="w-full btn-gradient"
+                  onClick={() => navigate(`/organizer/event/${event.event_id}`)}
                 >
                   View Details
-                </Badge>
+                </Button>
               </CardContent>
             </Card>
           ))}
