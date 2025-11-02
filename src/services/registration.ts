@@ -66,6 +66,8 @@ export async function registerUser(
 
     // Step 2: Hash email using SHA-3-256 (matching smart contract)
     const emailHash = hashEmail(data.email);
+    // Normalize hash: lowercase and trim to ensure consistent matching
+    const normalizedHash = emailHash.toLowerCase().trim();
 
     // Step 3: Map user type to smart contract role
     const role = getUserRole(data.userType);
@@ -76,7 +78,7 @@ export async function registerUser(
       first_name: data.firstName,
       last_name: data.lastName,
       email: data.email,
-      email_hash: emailHash,
+      email_hash: normalizedHash,
       user_type: data.userType,
       wallet_address: walletAddress,
       popchain_account_address: popchainAccountAddress,

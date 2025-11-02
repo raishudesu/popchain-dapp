@@ -1,5 +1,6 @@
 import { Navigate, Outlet } from "react-router";
 import { useAuth } from "@/contexts/auth-context";
+import PopLoader from "../pop-loader";
 
 interface ProtectedRouteProps {
   requiredRole?: "admin" | "organizer" | "attendee";
@@ -10,18 +11,7 @@ export function ProtectedRoute({ requiredRole }: ProtectedRouteProps) {
     useAuth();
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <img
-            src="/logos/popchain_logo.png"
-            alt="logo"
-            className="w-12 h-12 animate-bounce"
-          />
-          <p className="text-muted-foreground">Loading...</p>
-        </div>
-      </div>
-    );
+    return <PopLoader />;
   }
 
   if (!user) {
