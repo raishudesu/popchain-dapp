@@ -30,6 +30,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import BackButton from "@/components/back-button";
 
 const EventDetailsPage = () => {
   const { eventId } = useParams<{ eventId: string }>();
@@ -117,6 +118,7 @@ const EventDetailsPage = () => {
 
   return (
     <div className="space-y-6 p-8">
+      <BackButton />
       <div>
         <h1 className="text-3xl font-bold text-foreground mb-2">
           {event.name}

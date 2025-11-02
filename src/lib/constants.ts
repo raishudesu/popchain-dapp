@@ -1,10 +1,9 @@
 // ============ Contract Configuration ============
-// TODO: Replace with actual package ID after contract deployment
 export const CONTRACT_PACKAGE_ID =
-  "0xfb540197178a08a24a062c1497a81bd0ce022bef43b6b643499f9cb3c0ba9fbd";
+  "0x993e75120623d8a6abe32c3b8cd6926c06b02b444c5b7d0e07ca375a88325a94";
 
 export const PLATFORM_TREASURY_ADDRESS =
-  "0x35b57bd4f8846f85324e570a3540131538831bd07a42b5f10ddddc81d8af5529";
+  "0xef25c540d9d27d15d18f34c90e2c31f65a502e9784769777973f6486fb9a2b9c";
 
 // ============ Module Names ============
 export const MODULE_NAMES = {
@@ -27,6 +26,7 @@ export const WALLET_METHODS = {
 // User Module Methods
 export const USER_METHODS = {
   CREATE_ACCOUNT: "create_account",
+  LINK_WALLET: "link_wallet",
 } as const;
 
 // Event Module Methods
@@ -36,6 +36,11 @@ export const EVENT_METHODS = {
   REMOVE_FROM_WHITELIST: "remove_from_whitelist",
   CLOSE_EVENT: "close_event",
   MINT_CERTIFICATE_FOR_ATTENDEE: "mint_certificate_for_attendee",
+} as const;
+
+// Certificate Module Methods
+export const CERTIFICATE_METHODS = {
+  TRANSFER_CERTIFICATE_TO_WALLET: "transfer_certificate_to_wallet",
 } as const;
 
 // Admin Module Methods
@@ -65,6 +70,10 @@ export const FUNCTION_PATHS = {
     MODULE_NAMES.USER,
     USER_METHODS.CREATE_ACCOUNT
   ),
+  USER_LINK_WALLET: getFunctionPath(
+    MODULE_NAMES.USER,
+    USER_METHODS.LINK_WALLET
+  ),
 
   // Event functions
   EVENT_CREATE_WITH_DEFAULT_TIERS: getFunctionPath(
@@ -83,6 +92,12 @@ export const FUNCTION_PATHS = {
   EVENT_MINT_CERTIFICATE: getFunctionPath(
     MODULE_NAMES.EVENT,
     EVENT_METHODS.MINT_CERTIFICATE_FOR_ATTENDEE
+  ),
+
+  // Certificate functions
+  CERTIFICATE_TRANSFER_TO_WALLET: getFunctionPath(
+    MODULE_NAMES.CERTIFICATE,
+    CERTIFICATE_METHODS.TRANSFER_CERTIFICATE_TO_WALLET
   ),
 
   // Admin functions
@@ -104,4 +119,6 @@ export type ModuleName = (typeof MODULE_NAMES)[keyof typeof MODULE_NAMES];
 export type WalletMethod = (typeof WALLET_METHODS)[keyof typeof WALLET_METHODS];
 export type UserMethod = (typeof USER_METHODS)[keyof typeof USER_METHODS];
 export type EventMethod = (typeof EVENT_METHODS)[keyof typeof EVENT_METHODS];
+export type CertificateMethod =
+  (typeof CERTIFICATE_METHODS)[keyof typeof CERTIFICATE_METHODS];
 export type AdminMethod = (typeof ADMIN_METHODS)[keyof typeof ADMIN_METHODS];
