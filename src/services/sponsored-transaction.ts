@@ -5,6 +5,7 @@ import { hashEmailToBytes } from "@/utils/hash";
 import { FUNCTION_PATHS } from "@/lib/constants";
 import { extractAccountId } from "./onchain";
 import { networkConfig } from "@/configs/network-config";
+import { parseError } from "@/utils/errors";
 
 /**
  * Map user type to smart contract role enum
@@ -451,11 +452,13 @@ export async function requestSponsoredAccountCreation(
       };
     }
 
+    // Parse error and get user-friendly message
+    // Special handling for gas errors (keep existing behavior above)
+    const finalErrorMessage = parseError(error);
+
     return {
       success: false,
-      error:
-        errorMessage ||
-        "An unexpected error occurred during sponsored transaction",
+      error: finalErrorMessage,
     };
   }
 }
