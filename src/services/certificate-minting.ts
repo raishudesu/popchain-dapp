@@ -354,3 +354,137 @@ export async function getCertificateMintingData(
     organizerAccountId,
   };
 }
+
+/**
+ * Create a transaction to transfer a certificate to wallet
+ * @param accountId - PopChainAccount object ID
+ * @param certificateId - Certificate NFT object ID
+ * @returns Transaction object
+ */
+export function createTransferCertificateTransaction(
+  accountId: string,
+  certificateId: string
+): Transaction {
+  const tx = new Transaction();
+
+  tx.moveCall({
+    target: FUNCTION_PATHS.CERTIFICATE_TRANSFER_TO_WALLET,
+    arguments: [
+      tx.object(accountId), // &mut PopChainAccount
+      tx.object(certificateId), // CertificateNFT
+    ],
+  });
+
+  return tx;
+}
+
+/**
+ * Transfer a certificate to wallet address
+ * @param accountId - PopChainAccount object ID
+ * @param certificateId - Certificate NFT object ID
+ * @param suiClient - SuiClient instance
+ * @param signAndExecute - Function to sign and execute transaction
+ * @returns Success status and transaction digest
+ */
+export async function transferCertificateToWallet(
+  accountId: string,
+  certificateId: string,
+  suiClient: SuiClient,
+  signAndExecute: (params: {
+    transaction: Transaction;
+  }) => Promise<{ digest: string }>
+): Promise<{ success: boolean; digest?: string; error?: string }> {
+  try {
+    // With the updated contract, certificates without a wallet are owned by the service wallet
+    // We need to check who owns the certificate and sign accordingly
+
+    // First, check certificate ownership
+    const certObject = await suiClient.getObject({
+      id: certificateId,
+      options: {
+        showOwner: true,
+      },
+    });
+
+    if (!certObject.data || certObject.error) {
+      return {
+        success: false,
+        error: `Certificate not found: ${certificateId}`,
+      };
+    }
+
+    const owner = certObject.data.owner;
+    let ownerAddress = "";
+
+    if (typeof owner === "string") {
+      ownerAddress = owner;
+    } else if (owner && typeof owner === "object") {
+      if ("AddressOwner" in owner) {
+        ownerAddress = owner.AddressOwner;
+      }
+    }
+
+    // Get service wallet address
+    const serviceWallet = getServiceWallet();
+    const serviceWalletAddress = serviceWallet?.toSuiAddress();
+
+    // Create transaction
+    const tx = createTransferCertificateTransaction(accountId, certificateId);
+
+    // If certificate is owned by service wallet, use service wallet to sign
+    // Otherwise, use attendee's wallet to sign
+    let result;
+    if (ownerAddress === serviceWalletAddress && serviceWallet) {
+      // Certificate owned by service wallet - service wallet signs
+      // Note: In Sui, the signer pays gas. To have attendee pay gas while service wallet signs,
+      // we'd need to use programmable transaction blocks with multiple signers (complex).
+      // For now, service wallet pays gas when it owns the certificate.
+      const client = suiClient;
+      result = await client.signAndExecuteTransaction({
+        signer: serviceWallet,
+        transaction: tx,
+        options: {
+          showEffects: true,
+          showObjectChanges: true,
+        },
+      });
+    } else {
+      // Certificate owned by attendee's wallet - attendee signs and pays gas
+      result = await signAndExecute({ transaction: tx });
+    }
+
+    // Wait for transaction
+    await suiClient.waitForTransaction({
+      digest: result.digest,
+    });
+
+    return { success: true, digest: result.digest };
+  } catch (error) {
+    console.error("Error transferring certificate to wallet:", error);
+    const errorMessage =
+      error instanceof Error ? error.message : "Unknown error";
+
+    // Check for common errors
+    if (errorMessage.includes("notExists")) {
+      return {
+        success: false,
+        error: `Certificate or account not found. Please verify the certificate ID: ${certificateId}`,
+      };
+    }
+
+    if (
+      errorMessage.includes("unauthorized") ||
+      errorMessage.includes("invalid_address")
+    ) {
+      return {
+        success: false,
+        error: `Transaction failed. Please ensure your wallet is linked to your PopChain account and the certificate belongs to your account.`,
+      };
+    }
+
+    return {
+      success: false,
+      error: errorMessage,
+    };
+  }
+}

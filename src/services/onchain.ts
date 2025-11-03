@@ -166,3 +166,26 @@ export function extractAccountId(txResult: unknown): string | null {
 
   return null;
 }
+
+/**
+ * Create a transaction to link a wallet address to a PopChainAccount
+ * @param accountId - PopChainAccount object ID
+ * @param walletAddress - Wallet address to link
+ * @returns Transaction object
+ */
+export function createLinkWalletTransaction(
+  accountId: string,
+  walletAddress: string
+): Transaction {
+  const tx = new Transaction();
+
+  tx.moveCall({
+    target: FUNCTION_PATHS.USER_LINK_WALLET,
+    arguments: [
+      tx.object(accountId), // &mut PopChainAccount
+      tx.pure.address(walletAddress), // address
+    ],
+  });
+
+  return tx;
+}

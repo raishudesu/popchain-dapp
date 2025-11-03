@@ -1,9 +1,9 @@
 // ============ Contract Configuration ============
 export const CONTRACT_PACKAGE_ID =
-  "0xa6395655c94367444187b8b6f6cb83e48d89401fffa81f20d6f2905b4024217c";
+  "0xe69d51aca97655d253d691516d232a8e45e964aaf72455a4653e6e13337e883d";
 
 export const PLATFORM_TREASURY_ADDRESS =
-  "0x52d6ccc9dc75bc6af19f2ae49b9ba2f6a66df11ca07675b3a710e38ae7780163";
+  "0xc66e530adb6f4f08852de50b5eca2151e1cf44fd1000212cd885d3f382f0f4ec";
 
 // ============ Module Names ============
 export const MODULE_NAMES = {

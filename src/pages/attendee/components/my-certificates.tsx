@@ -1,5 +1,10 @@
-import { useQuery } from "@tanstack/react-query";
-import { useSuiClient } from "@mysten/dapp-kit";
+import { useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  useSuiClient,
+  useCurrentAccount,
+  useSignAndExecuteTransaction,
+} from "@mysten/dapp-kit";
 import { useAuth } from "@/contexts/auth-context";
 import {
   getCertificatesForAccount,
@@ -8,16 +13,28 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Spinner } from "@/components/ui/spinner";
 import { Badge } from "@/components/ui/badge";
-import { Award } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Award, Wallet, ArrowRight } from "lucide-react";
+import { toast } from "sonner";
 import {
   getTierByName,
   getTierImageUrl,
   type TierName,
 } from "@/lib/certificate-tiers";
+import { linkWalletToAccount } from "@/services/wallet";
+import { transferCertificateToWallet } from "@/services/certificate-minting";
+import supabase from "@/utils/supabase";
 
 export function MyCertificates() {
   const { profile, loading: authLoading } = useAuth();
   const suiClient = useSuiClient();
+  const account = useCurrentAccount();
+  const { mutateAsync: signAndExecute } = useSignAndExecuteTransaction();
+  const queryClient = useQueryClient();
+  const [linkingWallet, setLinkingWallet] = useState(false);
+  const [transferringCertId, setTransferringCertId] = useState<string | null>(
+    null
+  );
 
   // Fetch certificates from blockchain
   const {
@@ -75,6 +92,101 @@ export function MyCertificates() {
     },
     enabled: !authLoading && !!profile?.popchain_account_address,
   });
+
+  const handleLinkWallet = async () => {
+    if (!account || !profile?.popchain_account_address) {
+      toast.error(
+        "Please connect your wallet and ensure you have a PopChain account"
+      );
+      return;
+    }
+
+    setLinkingWallet(true);
+    try {
+      const walletAddress = account.address;
+      const result = await linkWalletToAccount(
+        profile.popchain_account_address,
+        walletAddress,
+        suiClient,
+        signAndExecute
+      );
+
+      if (result.success) {
+        // Update wallet address in database
+        // Type assertion needed due to Supabase TypeScript type inference issue
+        const { error: updateError } = await supabase
+          .from("user_profiles")
+          // @ts-expect-error - Supabase type inference issue with Database generic
+          .update({ wallet_address: walletAddress })
+          .eq("id", profile.id);
+
+        if (updateError) {
+          console.error(
+            "Error updating wallet address in database:",
+            updateError
+          );
+        }
+
+        // Invalidate queries to refresh data
+        queryClient.invalidateQueries({ queryKey: ["auth", "profile"] });
+        queryClient.invalidateQueries({ queryKey: ["my-certificates"] });
+
+        toast.success("Wallet linked successfully!");
+      } else {
+        toast.error(result.error || "Failed to link wallet");
+      }
+    } catch (error) {
+      console.error("Error linking wallet:", error);
+      toast.error(
+        error instanceof Error ? error.message : "Failed to link wallet"
+      );
+    } finally {
+      setLinkingWallet(false);
+    }
+  };
+
+  const handleTransferCertificate = async (certificateId: string) => {
+    if (
+      !account ||
+      !profile?.popchain_account_address ||
+      !profile?.wallet_address
+    ) {
+      toast.error(
+        "Please link your wallet first before transferring certificates"
+      );
+      return;
+    }
+
+    setTransferringCertId(certificateId);
+    try {
+      const result = await transferCertificateToWallet(
+        profile.popchain_account_address,
+        certificateId,
+        suiClient,
+        signAndExecute
+      );
+
+      if (result.success) {
+        // Wait a moment for blockchain state to update, then refresh
+        setTimeout(() => {
+          queryClient.invalidateQueries({ queryKey: ["my-certificates"] });
+        }, 1000);
+
+        toast.success("Certificate transferred to wallet successfully!");
+      } else {
+        toast.error(result.error || "Failed to transfer certificate");
+      }
+    } catch (error) {
+      console.error("Error transferring certificate:", error);
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Failed to transfer certificate"
+      );
+    } finally {
+      setTransferringCertId(null);
+    }
+  };
 
   if (authLoading || isLoading) {
     return (
@@ -207,6 +319,68 @@ export function MyCertificates() {
                   <p className="text-xs text-muted-foreground mt-2 truncate font-mono">
                     ID: {certificate.objectId.slice(0, 8)}...
                   </p>
+
+                  {/* Transfer Certificate Button / Status */}
+                  {!profile?.wallet_address ? (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full mt-3"
+                      onClick={handleLinkWallet}
+                      disabled={linkingWallet || !account}
+                    >
+                      {linkingWallet ? (
+                        <>
+                          <Spinner className="w-4 h-4 mr-2" />
+                          Linking...
+                        </>
+                      ) : (
+                        <>
+                          <Wallet className="w-4 h-4 mr-2" />
+                          Link Wallet to Transfer
+                        </>
+                      )}
+                    </Button>
+                  ) : certificate.ownerAddress === profile.wallet_address ? (
+                    <div className="mt-3 p-2 bg-green-500/10 border border-green-500/20 rounded-md">
+                      <div className="flex items-center gap-2 text-sm">
+                        <Wallet className="w-4 h-4 text-green-600 dark:text-green-400 flex-shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-green-600 dark:text-green-400 font-medium">
+                            Transferred to Wallet
+                          </p>
+                          <p className="text-xs text-muted-foreground truncate font-mono">
+                            {profile.wallet_address.slice(0, 6)}...
+                            {profile.wallet_address.slice(-4)}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full mt-3"
+                      onClick={() =>
+                        handleTransferCertificate(certificate.objectId)
+                      }
+                      disabled={
+                        transferringCertId === certificate.objectId || !account
+                      }
+                    >
+                      {transferringCertId === certificate.objectId ? (
+                        <>
+                          <Spinner className="w-4 h-4 mr-2" />
+                          Transferring...
+                        </>
+                      ) : (
+                        <>
+                          <ArrowRight className="w-4 h-4 mr-2" />
+                          Transfer to Wallet
+                        </>
+                      )}
+                    </Button>
+                  )}
                 </div>
               </div>
             ))}

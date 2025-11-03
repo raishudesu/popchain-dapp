@@ -77,6 +77,7 @@ export async function getCertificateFromBlockchain(
       options: {
         showContent: true,
         showType: true,
+        showOwner: true, // Explicitly request owner information
       },
     });
 
@@ -190,18 +191,41 @@ export async function getCertificateFromBlockchain(
       const certificateUrl =
         decodeSuiString(fields.url) || (fields.url as string) || "";
 
-      // Get owner address
+      // Get owner address - handle all possible owner formats
       let ownerAddress = "0x0";
-      if ("owner" in object.data) {
-        if (typeof object.data.owner === "string") {
-          ownerAddress = object.data.owner;
-        } else if (
-          typeof object.data.owner === "object" &&
-          object.data.owner !== null &&
-          "AddressOwner" in object.data.owner
-        ) {
-          ownerAddress = (object.data.owner as { AddressOwner: string })
-            .AddressOwner;
+
+      if (object.data && "owner" in object.data) {
+        const owner = object.data.owner;
+
+        if (typeof owner === "string") {
+          // Direct string owner (shouldn't happen in Sui, but handle it)
+          ownerAddress = owner;
+        } else if (owner && typeof owner === "object") {
+          // Handle different owner types in Sui
+          if ("AddressOwner" in owner) {
+            // Owned by an address
+            ownerAddress = (owner as { AddressOwner: string }).AddressOwner;
+          } else if ("ObjectOwner" in owner) {
+            // Owned by an object (like PopChainAccount)
+            ownerAddress = (owner as { ObjectOwner: string }).ObjectOwner;
+          } else if ("Shared" in owner) {
+            // Shared object
+            ownerAddress = "Shared";
+          } else if ("Immutable" in owner) {
+            // Immutable object
+            ownerAddress = "Immutable";
+          } else {
+            // Fallback: try to extract address from any property
+            // Sometimes the structure might be nested differently
+            const ownerObj = owner as Record<string, unknown>;
+            for (const key of Object.keys(ownerObj)) {
+              const value = ownerObj[key];
+              if (typeof value === "string" && value.startsWith("0x")) {
+                ownerAddress = value;
+                break;
+              }
+            }
+          }
         }
       }
 

@@ -127,3 +127,62 @@ export function createDepositTransaction(
 
   return tx;
 }
+
+/**
+ * Link a wallet address to a PopChainAccount
+ * @param accountId - PopChainAccount object ID
+ * @param walletAddress - Wallet address to link
+ * @param suiClient - SuiClient instance
+ * @param signAndExecute - Function to sign and execute transaction
+ * @returns Success status and transaction digest
+ */
+export async function linkWalletToAccount(
+  accountId: string,
+  walletAddress: string,
+  suiClient: SuiClient,
+  signAndExecute: (params: {
+    transaction: Transaction;
+  }) => Promise<{ digest: string }>
+): Promise<{ success: boolean; digest?: string; error?: string }> {
+  try {
+    // Import createLinkWalletTransaction from onchain.ts
+    const { createLinkWalletTransaction } = await import("./onchain");
+
+    // Create transaction
+    const tx = createLinkWalletTransaction(accountId, walletAddress);
+
+    // Execute transaction
+    const result = await signAndExecute({ transaction: tx });
+
+    // Wait for transaction
+    await suiClient.waitForTransaction({
+      digest: result.digest,
+    });
+
+    return { success: true, digest: result.digest };
+  } catch (error) {
+    console.error("Error linking wallet to account:", error);
+    const errorMessage =
+      error instanceof Error ? error.message : "Unknown error";
+
+    // Check for common errors
+    if (errorMessage.includes("notExists")) {
+      return {
+        success: false,
+        error: `Account not found. Please verify the account ID: ${accountId}`,
+      };
+    }
+
+    if (errorMessage.includes("invalid_address")) {
+      return {
+        success: false,
+        error: `Invalid wallet address. Please use a valid Sui wallet address.`,
+      };
+    }
+
+    return {
+      success: false,
+      error: errorMessage,
+    };
+  }
+}
