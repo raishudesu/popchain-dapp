@@ -10,8 +10,8 @@ import { Spinner } from "@/components/ui/spinner";
 import { Badge } from "@/components/ui/badge";
 import { Award } from "lucide-react";
 import {
-  getTierBadgeColor,
   getTierByName,
+  getTierImageUrl,
   type TierName,
 } from "@/lib/certificate-tiers";
 
@@ -46,7 +46,26 @@ export function MyCertificates() {
       const certificateDetails = await Promise.all(
         certificateIds.map(async (id) => {
           const cert = await getCertificateFromBlockchain(id, suiClient);
-          return cert ? { ...cert, id } : null;
+          if (!cert) return null;
+
+          // Get certificate image URL from blockchain (stored in certificateUrlHash field)
+          const imageUrl = cert.certificateUrlHash || null;
+
+          // Get tier image URL - use the one from blockchain first, fallback to our tier definitions
+          let tierImageUrl = cert.tier.imageUrl || null;
+          if (!tierImageUrl) {
+            const tier = getTierByName(cert.tier.name as TierName);
+            if (tier) {
+              tierImageUrl = getTierImageUrl(tier);
+            }
+          }
+
+          return {
+            ...cert,
+            id,
+            imageUrl,
+            tierImageUrl,
+          };
         })
       );
 
@@ -137,47 +156,56 @@ export function MyCertificates() {
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
             {certificateList.map((certificate) => (
               <div
                 key={certificate.objectId}
                 className="relative border rounded-lg overflow-hidden bg-muted group hover:shadow-lg transition-shadow"
               >
-                <div className="aspect-[9/16] relative">
-                  {/* Certificate image placeholder - we need to get the image URL from the certificate URL hash */}
-                  <div className="w-full h-full bg-gradient-to-br from-purple-500/20 to-blue-500/20 flex items-center justify-center">
-                    <Award className="w-16 h-16 text-muted-foreground/50" />
-                  </div>
-                  <div className="absolute top-2 left-2 bg-background/90 px-2 py-1 rounded text-xs font-medium">
-                    {certificate.tier.name || "Certificate"}
-                  </div>
-                  {(() => {
-                    const tier = getTierByName(
-                      certificate.tier.name as TierName
-                    );
-                    return tier && certificate.tier.level ? (
-                      <div className="absolute top-2 right-2">
-                        <Badge
-                          variant="outline"
-                          className={getTierBadgeColor(tier)}
-                        >
-                          {certificate.tier.level}
-                        </Badge>
-                      </div>
-                    ) : null;
-                  })()}
-                </div>
-                <div className="p-3">
-                  <p className="text-sm font-semibold truncate">
-                    {certificate.tier.name || "Certificate"}
-                  </p>
-                  {certificate.tier.description && (
-                    <p className="text-xs text-muted-foreground line-clamp-2 mt-1">
-                      {certificate.tier.description}
-                    </p>
+                <div className="relative bg-gradient-to-br from-purple-500/20 to-blue-500/20 overflow-hidden">
+                  {/* Certificate image - aspect ratio determined by image */}
+                  {certificate.imageUrl ? (
+                    <img
+                      src={certificate.imageUrl}
+                      alt={`${certificate.tier.name} Certificate`}
+                      className="w-full h-auto object-contain"
+                      onError={(e) => {
+                        e.currentTarget.style.display = "none";
+                      }}
+                    />
+                  ) : (
+                    <div className="w-full aspect-[9/16] flex items-center justify-center">
+                      <Award className="w-16 h-16 text-muted-foreground/50" />
+                    </div>
                   )}
+                </div>
+                <div className="p-3 space-y-2">
+                  {/* Tier data - similar to organizer dashboard */}
+                  <div className="flex items-center gap-2">
+                    {certificate.tierImageUrl && (
+                      <img
+                        src={certificate.tierImageUrl}
+                        alt={certificate.tier.name}
+                        className="w-6 h-6 object-contain"
+                      />
+                    )}
+                    <div className="flex-1">
+                      <p className="font-semibold text-sm">
+                        {certificate.tier.name || "Certificate"}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {certificate.tier.level && certificate.tier.description
+                          ? `${certificate.tier.level} • ${certificate.tier.description}`
+                          : certificate.tier.level ||
+                            certificate.tier.description ||
+                            ""}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Certificate ID */}
                   <p className="text-xs text-muted-foreground mt-2 truncate font-mono">
-                    {certificate.objectId.slice(0, 8)}...
+                    ID: {certificate.objectId.slice(0, 8)}...
                   </p>
                 </div>
               </div>

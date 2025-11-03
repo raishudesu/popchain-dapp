@@ -61,11 +61,16 @@ export function OrganizerSidebar() {
       <SidebarContent>
         <SidebarGroup>
           <SidebarHeader>
-            <img
-              src="/logos/popchain_logo.png"
-              alt="logo"
-              className="w-12 h-12 object-contain"
-            />
+            <div className="flex items-center gap-2">
+              <img
+                src={"/logos/popchain_logo.png"}
+                alt="popchain-logo"
+                className="w-12 h-12 object-contain"
+              />
+              <span className="font-bold text-lg text-gray-50 italic">
+                PopChain
+              </span>
+            </div>
             <SidebarGroupLabel>Organizer Dashboard</SidebarGroupLabel>
           </SidebarHeader>
 

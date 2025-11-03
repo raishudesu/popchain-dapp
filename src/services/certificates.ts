@@ -37,7 +37,7 @@ export async function getCertificatesByOwner(
 ): Promise<string[]> {
   try {
     const certificateType = `${CONTRACT_PACKAGE_ID}::popchain_certificate::Certificate`;
-    
+
     // Get all objects owned by the address with Certificate type
     const objects = await suiClient.getOwnedObjects({
       owner: ownerAddress,
@@ -88,7 +88,48 @@ export async function getCertificateFromBlockchain(
     if (content && "fields" in content) {
       const fields = content.fields as Record<string, unknown>;
 
-      // Decode tier if it's a struct
+      // Decode Sui Move strings (Vec<u8>) to regular strings
+      const decodeSuiString = (bytes: unknown): string => {
+        if (typeof bytes === "string") {
+          return bytes;
+        }
+        if (Array.isArray(bytes)) {
+          try {
+            const uint8Array = new Uint8Array(bytes);
+            return new TextDecoder().decode(uint8Array);
+          } catch {
+            return "";
+          }
+        }
+        // Handle nested structure: { fields: { bytes: string } }
+        if (
+          bytes &&
+          typeof bytes === "object" &&
+          bytes !== null &&
+          "fields" in bytes
+        ) {
+          const bytesObj = bytes as Record<string, unknown>;
+          if (
+            typeof bytesObj.fields === "object" &&
+            bytesObj.fields !== null &&
+            "bytes" in bytesObj.fields
+          ) {
+            const fieldsObj = bytesObj.fields as Record<string, unknown>;
+            const byteString = fieldsObj.bytes;
+            if (typeof byteString === "string") {
+              try {
+                return atob(byteString);
+              } catch {
+                return byteString;
+              }
+            }
+          }
+        }
+        return "";
+      };
+
+      // Extract tier information - based on actual structure:
+      // tier_name, tier_url are direct fields, not nested in a tier object
       let tier = {
         name: "",
         level: "",
@@ -96,15 +137,58 @@ export async function getCertificateFromBlockchain(
         imageUrl: "",
       };
 
-      if (fields.tier && typeof fields.tier === "object") {
-        const tierObj = fields.tier as Record<string, unknown>;
+      // Extract tier_name
+      const tierName =
+        decodeSuiString(fields.tier_name) || (fields.tier_name as string) || "";
+
+      // Extract tier_url (tier image URL)
+      const tierUrl =
+        decodeSuiString(fields.tier_url) || (fields.tier_url as string) || "";
+
+      // Get tier details from our tier definitions
+      const tierDefinition = getTierByName(tierName as TierName);
+
+      if (tierDefinition) {
         tier = {
-          name: (tierObj.name as string) || "",
-          level: (tierObj.level as string) || "",
-          description: (tierObj.description as string) || "",
-          imageUrl: (tierObj.image_url as string) || "",
+          name: tierName,
+          level: tierDefinition.level,
+          description: tierDefinition.description,
+          imageUrl: tierUrl || getTierImageUrl(tierDefinition),
+        };
+      } else {
+        // Fallback if tier definition not found
+        tier = {
+          name: tierName,
+          level: "",
+          description: "",
+          imageUrl: tierUrl,
         };
       }
+
+      // Extract event_id (handle nested id structure: { id: { id: "0x..." } })
+      let eventId = "";
+      if (fields.event_id) {
+        if (typeof fields.event_id === "string") {
+          eventId = fields.event_id;
+        } else if (
+          typeof fields.event_id === "object" &&
+          fields.event_id !== null
+        ) {
+          const idObj = fields.event_id as Record<string, unknown>;
+          if (idObj.id && typeof idObj.id === "object" && idObj.id !== null) {
+            const nestedId = idObj.id as Record<string, unknown>;
+            if (nestedId.id && typeof nestedId.id === "string") {
+              eventId = nestedId.id;
+            }
+          } else if (idObj.id && typeof idObj.id === "string") {
+            eventId = idObj.id;
+          }
+        }
+      }
+
+      // Extract certificate URL (stored as 'url' field)
+      const certificateUrl =
+        decodeSuiString(fields.url) || (fields.url as string) || "";
 
       // Get owner address
       let ownerAddress = "0x0";
@@ -123,8 +207,8 @@ export async function getCertificateFromBlockchain(
 
       return {
         objectId: certificateId,
-        eventId: (fields.event_id as string) || "",
-        certificateUrlHash: (fields.certificate_url_hash as string) || "",
+        eventId: eventId,
+        certificateUrlHash: certificateUrl, // Store the actual URL, not hash
         tier,
         ownerAddress,
       };
@@ -138,10 +222,64 @@ export async function getCertificateFromBlockchain(
 }
 
 /**
+ * Get certificates from PopChainAccount object
+ * @param popchainAccountId - PopChainAccount object ID
+ * @param suiClient - SuiClient instance
+ * @returns Array of certificate object IDs or empty array
+ */
+async function getCertificatesFromPopChainAccount(
+  popchainAccountId: string,
+  suiClient: SuiClient
+): Promise<string[]> {
+  try {
+    const account = await suiClient.getObject({
+      id: popchainAccountId,
+      options: {
+        showContent: true,
+        showType: true,
+      },
+    });
+
+    if (!account.data || account.error || !("content" in account.data)) {
+      return [];
+    }
+
+    const content = account.data.content;
+    if (content && "fields" in content) {
+      const fields = content.fields as Record<string, unknown>;
+
+      // Check if certificates field exists
+      if (fields.certificates) {
+        if (Array.isArray(fields.certificates)) {
+          return fields.certificates.filter(
+            (id): id is string => typeof id === "string"
+          );
+        }
+        // Handle if it's stored differently (e.g., as a Vec)
+        if (
+          typeof fields.certificates === "object" &&
+          fields.certificates !== null
+        ) {
+          const certObj = fields.certificates as Record<string, unknown>;
+          if ("vec" in certObj && Array.isArray(certObj.vec)) {
+            return certObj.vec.filter(
+              (id): id is string => typeof id === "string"
+            );
+          }
+        }
+      }
+    }
+
+    return [];
+  } catch (error) {
+    console.error("Error fetching certificates from PopChainAccount:", error);
+    return [];
+  }
+}
+
+/**
  * Get all certificates for a PopChainAccount
- * Certificates are owned by either the wallet address or 0x0 (if no wallet linked)
- * Note: Certificates owned by 0x0 are shared across all users, so we query them and filter
- * by checking if they belong to events associated with this account
+ * Certificates are owned by either the wallet address or stored in the PopChainAccount
  * @param popchainAccountId - PopChainAccount object ID
  * @param walletAddress - Optional wallet address (if linked)
  * @param suiClient - SuiClient instance
@@ -156,23 +294,27 @@ export async function getCertificatesForAccount(
 
   // Get certificates owned by wallet address (if wallet is linked)
   if (walletAddress && walletAddress !== "0x0") {
-    const walletCertificates = await getCertificatesByOwner(
-      walletAddress,
-      suiClient
-    );
-    certificateIds.push(...walletCertificates);
+    try {
+      const walletCertificates = await getCertificatesByOwner(
+        walletAddress,
+        suiClient
+      );
+      certificateIds.push(...walletCertificates);
+    } catch (error) {
+      console.warn("Error fetching certificates from wallet address:", error);
+    }
   }
 
-  // Get certificates owned by 0x0 (for PopChainAccount-linked certificates)
-  // Note: This will return certificates from all users, but we can't easily filter
-  // them without additional information. For now, we'll include them.
-  // In the future, we might want to query the PopChainAccount's certificates field
-  // or filter by checking event associations.
-  const nullCertificates = await getCertificatesByOwner("0x0", suiClient);
-  
-  // TODO: Filter null certificates by checking if they belong to events
-  // associated with this PopChainAccount. For now, we include all 0x0 certificates.
-  certificateIds.push(...nullCertificates);
+  // Try to get certificates from PopChainAccount object
+  try {
+    const accountCertificates = await getCertificatesFromPopChainAccount(
+      popchainAccountId,
+      suiClient
+    );
+    certificateIds.push(...accountCertificates);
+  } catch (error) {
+    console.warn("Error fetching certificates from PopChainAccount:", error);
+  }
 
   // Remove duplicates
   return [...new Set(certificateIds)];
