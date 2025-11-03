@@ -4,6 +4,7 @@ import { FUNCTION_PATHS, PLATFORM_TREASURY_ADDRESS } from "@/lib/constants";
 import type { Certificate } from "@/types/database";
 import { fetchEventById, getEventFromBlockchain } from "./events";
 import { getServiceWallet, getSuiClient } from "./sponsored-transaction";
+import { parseError } from "@/utils/errors";
 
 /**
  * Extract the certificate object ID from transaction result
@@ -209,29 +210,9 @@ export async function mintCertificateForAttendeeSponsored(
     };
   } catch (error) {
     console.error("Error minting certificate:", error);
-    const errorMessage =
-      error instanceof Error ? error.message : "Unknown error";
 
-    // Check for common errors
-    if (errorMessage.includes("notExists")) {
-      return {
-        success: false,
-        error: `Object not found. The organizer account or event might not exist on-chain. Please verify the organizer account ID: ${organizerAccountId}`,
-      };
-    }
-
-    if (
-      errorMessage.includes("unauthorized") ||
-      errorMessage.includes("sender")
-    ) {
-      return {
-        success: false,
-        error:
-          `Transaction unauthorized. The sender must be either the event organizer or the treasury owner (platform owner). ` +
-          `Please verify that VITE_SERVICE_WALLET_PRIVATE_KEY is set to the treasury owner's private key ` +
-          `(the address that initialized the PlatformTreasury).`,
-      };
-    }
+    // Parse error and get user-friendly message
+    const errorMessage = parseError(error);
 
     return {
       success: false,
@@ -461,26 +442,9 @@ export async function transferCertificateToWallet(
     return { success: true, digest: result.digest };
   } catch (error) {
     console.error("Error transferring certificate to wallet:", error);
-    const errorMessage =
-      error instanceof Error ? error.message : "Unknown error";
 
-    // Check for common errors
-    if (errorMessage.includes("notExists")) {
-      return {
-        success: false,
-        error: `Certificate or account not found. Please verify the certificate ID: ${certificateId}`,
-      };
-    }
-
-    if (
-      errorMessage.includes("unauthorized") ||
-      errorMessage.includes("invalid_address")
-    ) {
-      return {
-        success: false,
-        error: `Transaction failed. Please ensure your wallet is linked to your PopChain account and the certificate belongs to your account.`,
-      };
-    }
+    // Parse error and get user-friendly message
+    const errorMessage = parseError(error);
 
     return {
       success: false,

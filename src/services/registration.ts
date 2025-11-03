@@ -38,7 +38,12 @@ export async function registerUser(
 ): Promise<RegistrationResult> {
   try {
     // Get the site URL from environment variable, default to current origin
-    // In production, set VITE_APP_URL to your production domain
+    // IMPORTANT: The confirmation email URL is generated from Supabase's Site URL setting,
+    // not from emailRedirectTo. Make sure to:
+    // 1. Set VITE_APP_URL in production environment
+    // 2. Update Supabase Dashboard > Authentication > URL Configuration:
+    //    - Site URL: Your production domain (e.g., https://yourdomain.com)
+    //    - Redirect URLs: Add your production domain
     const siteUrl = import.meta.env.VITE_APP_URL || window.location.origin;
 
     // Step 1: Create Supabase auth user
@@ -46,6 +51,8 @@ export async function registerUser(
       email: data.email,
       password: data.password,
       options: {
+        // This redirects AFTER confirmation, but the confirmation link itself
+        // is generated from Site URL in Supabase dashboard settings
         emailRedirectTo: `${siteUrl}/login`,
         data: {
           first_name: data.firstName,

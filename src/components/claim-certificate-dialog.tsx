@@ -26,6 +26,7 @@ import {
 } from "@/lib/certificate-tiers";
 import { Badge } from "@/components/ui/badge";
 import { Gift } from "lucide-react";
+import { parseError } from "@/utils/errors";
 
 interface ClaimCertificateDialogProps {
   certificateId: string;
@@ -126,34 +127,17 @@ export function ClaimCertificateDialog({
         onClaimed?.();
         onOpenChange(false);
       } else {
-        // Check if error is due to authorization
-        if (
-          result.error?.includes("unauthorized") ||
-          result.error?.includes("sender")
-        ) {
-          toast.error(
-            "Transaction unauthorized. Please contact support if this issue persists."
-          );
-        } else {
-          toast.error(result.error || "Failed to claim certificate");
-        }
+        // Error message is already parsed and user-friendly from parseError
+        toast.error(result.error || "Failed to claim certificate");
       }
     } catch (error) {
       console.error("Error claiming certificate:", error);
-      const errorMessage =
-        error instanceof Error ? error.message : "Failed to claim certificate";
 
-      // Check if error is due to authorization
-      if (
-        errorMessage.includes("unauthorized") ||
-        errorMessage.includes("sender")
-      ) {
-        toast.error(
-          "Transaction unauthorized. Please contact support if this issue persists."
-        );
-      } else {
-        toast.error(errorMessage);
-      }
+      // Parse error and get user-friendly message
+
+      const errorMessage = parseError(error);
+
+      toast.error(errorMessage);
     } finally {
       setIsClaiming(false);
     }

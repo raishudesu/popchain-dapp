@@ -23,6 +23,7 @@ import {
 } from "@/lib/certificate-tiers";
 import { linkWalletToAccount } from "@/services/wallet";
 import { transferCertificateToWallet } from "@/services/certificate-minting";
+import { parseError } from "@/utils/errors";
 import supabase from "@/utils/supabase";
 
 export function MyCertificates() {
@@ -174,15 +175,15 @@ export function MyCertificates() {
 
         toast.success("Certificate transferred to wallet successfully!");
       } else {
+        // Error message is already parsed and user-friendly from parseError
         toast.error(result.error || "Failed to transfer certificate");
       }
     } catch (error) {
       console.error("Error transferring certificate:", error);
-      toast.error(
-        error instanceof Error
-          ? error.message
-          : "Failed to transfer certificate"
-      );
+
+      // Parse error and get user-friendly message
+      const errorMessage = parseError(error);
+      toast.error(errorMessage);
     } finally {
       setTransferringCertId(null);
     }
