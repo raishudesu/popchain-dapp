@@ -37,11 +37,16 @@ export async function registerUser(
   popchainAccountAddress: string
 ): Promise<RegistrationResult> {
   try {
+    // Get the site URL from environment variable, default to current origin
+    // In production, set VITE_APP_URL to your production domain
+    const siteUrl = import.meta.env.VITE_APP_URL || window.location.origin;
+
     // Step 1: Create Supabase auth user
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email: data.email,
       password: data.password,
       options: {
+        emailRedirectTo: `${siteUrl}/login`,
         data: {
           first_name: data.firstName,
           last_name: data.lastName,
