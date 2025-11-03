@@ -2,6 +2,7 @@ import { createContext, useContext } from "react";
 import type { ReactNode } from "react";
 import type { User } from "@supabase/supabase-js";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useDisconnectWallet } from "@mysten/dapp-kit";
 import supabase from "@/utils/supabase";
 import type { UserProfile } from "@/types/database";
 
@@ -23,6 +24,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
+  const { mutate: disconnectWallet } = useDisconnectWallet();
 
   // Query for current user session
   const { data: sessionData, isLoading: sessionLoading } = useQuery({
@@ -173,6 +175,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signOut = async () => {
     try {
+      // Disconnect wallet first
+      disconnectWallet();
+
+      // Then sign out from Supabase
       await signOutMutation.mutateAsync();
     } catch (error) {
       console.error("Error during sign out:", error);
