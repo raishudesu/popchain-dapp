@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useNavigate } from "react-router";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Form } from "@/components/ui/form";
@@ -15,9 +16,16 @@ import { Input } from "@/components/ui/input";
 import { Eye, EyeOff } from "lucide-react";
 import { loginSchema } from "@/schemas/login";
 import type { LoginFormData } from "@/schemas/login";
+import { useAuth } from "@/contexts/auth-context";
+import type { UserProfile } from "@/types/database";
+import { toast } from "sonner";
+import { Spinner } from "@/components/ui/spinner";
 
 export function LoginForm() {
   const [showPassword, setShowPassword] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const { signIn } = useAuth();
+  const navigate = useNavigate();
 
   const form = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
@@ -28,10 +36,51 @@ export function LoginForm() {
     },
   });
 
-  const handleSubmit = (data: LoginFormData) => {
-    console.log("Form submitted:", data);
-    // Handle form submission here
-    alert("Login successful! Check console for details.");
+  const handleSubmit = async (data: LoginFormData) => {
+    setIsSubmitting(true);
+    try {
+      const { error, profile } = await signIn(data.email, data.password);
+
+      if (error) {
+        toast.error(error.message || "Invalid email or password");
+        return;
+      }
+
+      if (!profile) {
+        toast.error("User profile not found. Please contact support.");
+        return;
+      }
+
+      toast.success("Login successful!");
+
+      // Redirect based on user role from profile
+      // role: 0 = Attendee, 1 = Organizer, 2 = Both
+      const role = profile.role;
+      const isAdminUser =
+        profile.email === import.meta.env.VITE_ADMIN_EMAIL ||
+        ("is_admin" in profile &&
+          (profile as UserProfile & { is_admin?: boolean }).is_admin === true);
+      const isOrganizerUser = role === 1 || role === 2;
+      const isAttendeeUser = role === 0 || role === 2;
+
+      if (isAdminUser) {
+        navigate("/admin/dashboard");
+      } else if (isOrganizerUser && !isAttendeeUser) {
+        navigate("/organizer/dashboard");
+      } else if (isAttendeeUser && !isOrganizerUser) {
+        navigate("/attendee/dashboard");
+      } else if (isOrganizerUser && isAttendeeUser) {
+        // User has both roles, default to organizer
+        navigate("/organizer/dashboard");
+      } else {
+        navigate("/");
+      }
+    } catch (error) {
+      toast.error("An unexpected error occurred");
+      console.error("Login error:", error);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -116,8 +165,19 @@ export function LoginForm() {
 
             {/* Submit Button */}
             <div className="mt-8">
-              <Button type="submit" className="w-full btn-gradient">
-                Sign In
+              <Button
+                type="submit"
+                className="w-full btn-gradient"
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? (
+                  <>
+                    <Spinner />
+                    <span>Signing in...</span>
+                  </>
+                ) : (
+                  "Sign In"
+                )}
               </Button>
             </div>
 

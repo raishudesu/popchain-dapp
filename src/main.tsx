@@ -2,6 +2,7 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import App from "./App.tsx";
 import { ThemeProvider } from "./providers/theme-provider.tsx";
+import { AuthProvider } from "./contexts/auth-context";
 
 import "@mysten/dapp-kit/dist/index.css";
 import { BrowserRouter } from "react-router";
@@ -18,7 +19,9 @@ createRoot(document.getElementById("root")!).render(
         <QueryClientProvider client={queryClient}>
           <SuiClientProvider networks={networkConfig} defaultNetwork="testnet">
             <WalletProvider autoConnect>
-              <App />
+              <AuthProvider>
+                <App />
+              </AuthProvider>
             </WalletProvider>
           </SuiClientProvider>
         </QueryClientProvider>

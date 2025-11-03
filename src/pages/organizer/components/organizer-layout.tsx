@@ -6,7 +6,7 @@ export default function OrganizerLayout() {
   return (
     <SidebarProvider>
       <OrganizerSidebar />
-      <main>
+      <main className="w-full">
         <SidebarTrigger />
         <Outlet />
       </main>

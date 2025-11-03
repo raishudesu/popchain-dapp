@@ -1,3 +1,4 @@
+import { LogOut } from "lucide-react";
 import { ModeToggle } from "./mode-toggle";
 import { Button } from "./ui/button";
 import { NavConnectButton } from "./nav-connect-button";
@@ -9,6 +10,7 @@ import {
   SheetTrigger,
 } from "./ui/sheet";
 import { Menu } from "lucide-react";
+import { useAuth } from "@/contexts/auth-context";
 
 interface NavLink {
   href: string;
@@ -26,6 +28,19 @@ export function MobileMenuSheet({
   open,
   onOpenChange,
 }: MobileMenuSheetProps) {
+  const { user, signOut } = useAuth();
+
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+      onOpenChange(false);
+    } catch (error) {
+      console.error("Failed to sign out:", error);
+      // Fallback: redirect manually if signOut fails
+      window.location.href = "/login";
+    }
+  };
+
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetTrigger asChild>
@@ -53,9 +68,20 @@ export function MobileMenuSheet({
             <ModeToggle />
           </div>
           <div className="flex flex-col gap-2">
-            <a href="/login" onClick={() => onOpenChange(false)}>
-              <Button className="btn-gradient w-full">Get Started</Button>
-            </a>
+            {user ? (
+              <Button
+                variant="outline"
+                onClick={handleSignOut}
+                className="w-full flex items-center justify-center gap-2"
+              >
+                <LogOut className="h-4 w-4" />
+                Sign Out
+              </Button>
+            ) : (
+              <a href="/login" onClick={() => onOpenChange(false)}>
+                <Button className="btn-gradient w-full">Get Started</Button>
+              </a>
+            )}
             <NavConnectButton className="w-full" />
           </div>
         </div>
