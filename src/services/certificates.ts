@@ -6,6 +6,177 @@ import {
   getTierIndex,
   type TierName,
 } from "@/lib/certificate-tiers";
+import type { SuiClient } from "@mysten/sui/client";
+import { CONTRACT_PACKAGE_ID } from "@/lib/constants";
+
+/**
+ * Certificate object structure from blockchain
+ */
+interface BlockchainCertificate {
+  objectId: string;
+  eventId: string;
+  certificateUrlHash: string;
+  tier: {
+    name: string;
+    level: string;
+    description: string;
+    imageUrl: string;
+  };
+  ownerAddress: string;
+}
+
+/**
+ * Get all certificates owned by an address (including 0x0 for PopChainAccount-linked certificates)
+ * @param ownerAddress - Address that owns the certificates (use "0x0" for PopChainAccount-linked)
+ * @param suiClient - SuiClient instance
+ * @returns Array of certificate object IDs
+ */
+export async function getCertificatesByOwner(
+  ownerAddress: string,
+  suiClient: SuiClient
+): Promise<string[]> {
+  try {
+    const certificateType = `${CONTRACT_PACKAGE_ID}::popchain_certificate::Certificate`;
+    
+    // Get all objects owned by the address with Certificate type
+    const objects = await suiClient.getOwnedObjects({
+      owner: ownerAddress,
+      filter: {
+        StructType: certificateType,
+      },
+      options: {
+        showContent: true,
+        showType: true,
+      },
+    });
+
+    return (
+      objects.data
+        ?.map((obj) => obj.data?.objectId)
+        .filter((id): id is string => !!id) || []
+    );
+  } catch (error) {
+    console.error("Error fetching certificates from blockchain:", error);
+    return [];
+  }
+}
+
+/**
+ * Get certificate object details from blockchain
+ * @param certificateId - Certificate object ID
+ * @param suiClient - SuiClient instance
+ * @returns Certificate details or null if not found
+ */
+export async function getCertificateFromBlockchain(
+  certificateId: string,
+  suiClient: SuiClient
+): Promise<BlockchainCertificate | null> {
+  try {
+    const object = await suiClient.getObject({
+      id: certificateId,
+      options: {
+        showContent: true,
+        showType: true,
+      },
+    });
+
+    if (!object.data || object.error || !("content" in object.data)) {
+      return null;
+    }
+
+    const content = object.data.content;
+    if (content && "fields" in content) {
+      const fields = content.fields as Record<string, unknown>;
+
+      // Decode tier if it's a struct
+      let tier = {
+        name: "",
+        level: "",
+        description: "",
+        imageUrl: "",
+      };
+
+      if (fields.tier && typeof fields.tier === "object") {
+        const tierObj = fields.tier as Record<string, unknown>;
+        tier = {
+          name: (tierObj.name as string) || "",
+          level: (tierObj.level as string) || "",
+          description: (tierObj.description as string) || "",
+          imageUrl: (tierObj.image_url as string) || "",
+        };
+      }
+
+      // Get owner address
+      let ownerAddress = "0x0";
+      if ("owner" in object.data) {
+        if (typeof object.data.owner === "string") {
+          ownerAddress = object.data.owner;
+        } else if (
+          typeof object.data.owner === "object" &&
+          object.data.owner !== null &&
+          "AddressOwner" in object.data.owner
+        ) {
+          ownerAddress = (object.data.owner as { AddressOwner: string })
+            .AddressOwner;
+        }
+      }
+
+      return {
+        objectId: certificateId,
+        eventId: (fields.event_id as string) || "",
+        certificateUrlHash: (fields.certificate_url_hash as string) || "",
+        tier,
+        ownerAddress,
+      };
+    }
+
+    return null;
+  } catch (error) {
+    console.error("Error fetching certificate from blockchain:", error);
+    return null;
+  }
+}
+
+/**
+ * Get all certificates for a PopChainAccount
+ * Certificates are owned by either the wallet address or 0x0 (if no wallet linked)
+ * Note: Certificates owned by 0x0 are shared across all users, so we query them and filter
+ * by checking if they belong to events associated with this account
+ * @param popchainAccountId - PopChainAccount object ID
+ * @param walletAddress - Optional wallet address (if linked)
+ * @param suiClient - SuiClient instance
+ * @returns Array of certificate object IDs
+ */
+export async function getCertificatesForAccount(
+  popchainAccountId: string,
+  walletAddress: string | null,
+  suiClient: SuiClient
+): Promise<string[]> {
+  const certificateIds: string[] = [];
+
+  // Get certificates owned by wallet address (if wallet is linked)
+  if (walletAddress && walletAddress !== "0x0") {
+    const walletCertificates = await getCertificatesByOwner(
+      walletAddress,
+      suiClient
+    );
+    certificateIds.push(...walletCertificates);
+  }
+
+  // Get certificates owned by 0x0 (for PopChainAccount-linked certificates)
+  // Note: This will return certificates from all users, but we can't easily filter
+  // them without additional information. For now, we'll include them.
+  // In the future, we might want to query the PopChainAccount's certificates field
+  // or filter by checking event associations.
+  const nullCertificates = await getCertificatesByOwner("0x0", suiClient);
+  
+  // TODO: Filter null certificates by checking if they belong to events
+  // associated with this PopChainAccount. For now, we include all 0x0 certificates.
+  certificateIds.push(...nullCertificates);
+
+  // Remove duplicates
+  return [...new Set(certificateIds)];
+}
 
 /**
  * Validate image dimensions

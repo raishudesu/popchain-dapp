@@ -145,6 +145,7 @@ export async function getEventFromBlockchain(
   name: string;
   description: string;
   organizer: string;
+  organizerAccount: string;
 } | null> {
   try {
     const object = await suiClient.getObject({
@@ -163,11 +164,32 @@ export async function getEventFromBlockchain(
     if (content && "fields" in content) {
       const fields = content.fields as Record<string, unknown>;
 
+      // organizer_account is stored as an ID object
+      let organizerAccount = "";
+      if (fields.organizer_account) {
+        if (typeof fields.organizer_account === "string") {
+          organizerAccount = fields.organizer_account;
+        } else if (
+          typeof fields.organizer_account === "object" &&
+          fields.organizer_account !== null
+        ) {
+          // Handle ID object structure: { fields: { inner: "0x..." } }
+          const idObj = fields.organizer_account as Record<string, unknown>;
+          if (idObj.fields && typeof idObj.fields === "object") {
+            const idFields = idObj.fields as Record<string, unknown>;
+            if (idFields.inner && typeof idFields.inner === "string") {
+              organizerAccount = idFields.inner;
+            }
+          }
+        }
+      }
+
       return {
         active: (fields.active as boolean) ?? false,
         name: decodeSuiString(fields.name),
         description: decodeSuiString(fields.description),
         organizer: (fields.organizer as string) || "",
+        organizerAccount,
       };
     }
 

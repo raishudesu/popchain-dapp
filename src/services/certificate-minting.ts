@@ -6,6 +6,92 @@ import { fetchEventById, getEventFromBlockchain } from "./events";
 import { getServiceWallet, getSuiClient } from "./sponsored-transaction";
 
 /**
+ * Extract the certificate object ID from transaction result
+ * @param txResult - Transaction result from signAndExecuteTransaction
+ * @returns The certificate object ID, or null if not found
+ */
+function extractCertificateId(txResult: unknown): string | null {
+  if (!txResult || typeof txResult !== "object") {
+    return null;
+  }
+
+  const result = txResult as Record<string, unknown>;
+
+  // Check objectChanges for created certificate
+  if (result.objectChanges && Array.isArray(result.objectChanges)) {
+    const objectChanges = result.objectChanges as Array<{
+      type?: string;
+      objectId?: string;
+      objectType?: string;
+    }>;
+
+    // Look for created Certificate object
+    const createdCertificate = objectChanges.find(
+      (change) =>
+        change.type === "created" &&
+        change.objectId &&
+        (change.objectType?.includes("Certificate") ||
+          change.objectType?.includes("certificate"))
+    );
+
+    if (createdCertificate?.objectId) {
+      return createdCertificate.objectId;
+    }
+
+    // Fallback: get first created object that might be the certificate
+    const firstCreated = objectChanges.find(
+      (change) => change.type === "created" && change.objectId
+    );
+
+    if (firstCreated?.objectId) {
+      return firstCreated.objectId;
+    }
+  }
+
+  // Check effects.created
+  if (result.effects && typeof result.effects === "object") {
+    const effectsObj = result.effects as Record<string, unknown>;
+
+    if ("created" in effectsObj && Array.isArray(effectsObj.created)) {
+      const created = effectsObj.created as Array<{
+        reference?: { objectId?: string };
+        owner?: unknown;
+        objectId?: string;
+      }>;
+
+      for (const item of created) {
+        if (item.objectId) {
+          return item.objectId;
+        }
+        if (item.reference?.objectId) {
+          return item.reference.objectId;
+        }
+      }
+    }
+  }
+
+  // Check events for CertificateMintedToAttendee event
+  if (result.events && Array.isArray(result.events)) {
+    const events = result.events as Array<{
+      type?: string;
+      parsedJson?: { certificate_id?: string };
+    }>;
+
+    const mintEvent = events.find(
+      (event) =>
+        event.type?.includes("CertificateMintedToAttendee") ||
+        event.type?.includes("CertificateMinted")
+    );
+
+    if (mintEvent?.parsedJson?.certificate_id) {
+      return mintEvent.parsedJson.certificate_id;
+    }
+  }
+
+  return null;
+}
+
+/**
  * Create a transaction to mint a certificate for an attendee
  * @param eventId - Event object ID from blockchain
  * @param organizerAccountId - Organizer's PopChainAccount object ID
@@ -54,7 +140,12 @@ export async function mintCertificateForAttendeeSponsored(
   organizerAccountId: string,
   attendeeAccountId: string,
   suiClient?: SuiClient
-): Promise<{ success: boolean; digest?: string; error?: string }> {
+): Promise<{
+  success: boolean;
+  digest?: string;
+  certificateId?: string;
+  error?: string;
+}> {
   try {
     // Verify certificate has all required data
     if (!certificate.event_id) {
@@ -92,9 +183,8 @@ export async function mintCertificateForAttendeeSponsored(
       certificate.tier_index
     );
 
-    // Sign and execute using service wallet (package owner sponsors the transaction)
-    // Note: The smart contract requires sender == event.organizer, so the service wallet
-    // must match the organizer's address, or the contract must allow package owner to call this
+    // Sign and execute using service wallet (treasury owner/platform owner sponsors the transaction)
+    // The updated contract allows either the event organizer OR the treasury owner to call this function
     const result = await client.signAndExecuteTransaction({
       signer: serviceWallet,
       transaction: tx,
@@ -109,7 +199,14 @@ export async function mintCertificateForAttendeeSponsored(
       digest: result.digest,
     });
 
-    return { success: true, digest: result.digest };
+    // Extract certificate ID from transaction result
+    const certificateId = extractCertificateId(result);
+
+    return {
+      success: true,
+      digest: result.digest,
+      certificateId: certificateId || undefined,
+    };
   } catch (error) {
     console.error("Error minting certificate:", error);
     const errorMessage =
@@ -130,9 +227,9 @@ export async function mintCertificateForAttendeeSponsored(
       return {
         success: false,
         error:
-          `Transaction unauthorized. The smart contract requires sender == event.organizer. ` +
-          `The service wallet address must match the event organizer's address, ` +
-          `or the contract needs to be updated to allow the package owner to call this function.`,
+          `Transaction unauthorized. The sender must be either the event organizer or the treasury owner (platform owner). ` +
+          `Please verify that VITE_SERVICE_WALLET_PRIVATE_KEY is set to the treasury owner's private key ` +
+          `(the address that initialized the PlatformTreasury).`,
       };
     }
 
@@ -239,9 +336,9 @@ export async function getCertificateMintingData(
         certificate.event_id,
         suiClient
       );
-      if (blockchainEvent && blockchainEvent.organizer) {
-        // The organizer field from blockchain is the PopChainAccount address
-        organizerAccountId = blockchainEvent.organizer;
+      if (blockchainEvent && blockchainEvent.organizerAccount) {
+        // Use organizerAccount field (PopChainAccount object ID) from blockchain
+        organizerAccountId = blockchainEvent.organizerAccount;
       }
     } catch (error) {
       console.error("Failed to fetch event from blockchain:", error);

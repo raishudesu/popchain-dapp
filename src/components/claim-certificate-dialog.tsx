@@ -111,9 +111,9 @@ export function ClaimCertificateDialog({
         );
       }
 
-      // Use sponsored transaction - service wallet (organizer's key) signs the transaction
-      // The organizer's PopChainAccount will be charged the fee via charge_platform_fee
-      // Attendee doesn't need wallet connected - transaction is sponsored
+      // Use sponsored transaction - service wallet (treasury owner) signs and sponsors the transaction
+      // The organizer's PopChainAccount will be charged the minting fee via charge_platform_fee
+      // Attendee doesn't need wallet connected - transaction is fully sponsored by platform owner
       const result = await mintCertificateForAttendeeSponsored(
         certificate,
         mintingData.organizerAccountId,
@@ -129,10 +129,10 @@ export function ClaimCertificateDialog({
         // Check if error is due to authorization
         if (
           result.error?.includes("unauthorized") ||
-          result.error?.includes("organizer")
+          result.error?.includes("sender")
         ) {
           toast.error(
-            "Certificate minting must be initiated by the event organizer. Please contact the organizer to claim your certificate."
+            "Transaction unauthorized. Please contact support if this issue persists."
           );
         } else {
           toast.error(result.error || "Failed to claim certificate");
@@ -146,11 +146,10 @@ export function ClaimCertificateDialog({
       // Check if error is due to authorization
       if (
         errorMessage.includes("unauthorized") ||
-        errorMessage.includes("organizer") ||
         errorMessage.includes("sender")
       ) {
         toast.error(
-          "Certificate minting must be initiated by the event organizer. Please contact the organizer to claim your certificate."
+          "Transaction unauthorized. Please contact support if this issue persists."
         );
       } else {
         toast.error(errorMessage);
