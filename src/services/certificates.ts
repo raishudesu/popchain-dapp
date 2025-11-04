@@ -685,15 +685,20 @@ export async function deleteCertificate(
 
   const filePath = urlParts[1];
 
-  // Delete from storage using admin client
-  const bucketName = "certificates";
-  const { error: storageError } = await supabaseAdmin.storage
-    .from(bucketName)
-    .remove([filePath]);
+  // Skip deletion if image is from defaults folder
+  if (filePath.startsWith("defaults/")) {
+    console.log("Skipping deletion of default certificate image:", filePath);
+  } else {
+    // Delete from storage using admin client
+    const bucketName = "certificates";
+    const { error: storageError } = await supabaseAdmin.storage
+      .from(bucketName)
+      .remove([filePath]);
 
-  if (storageError) {
-    console.error("Error deleting certificate from storage:", storageError);
-    // Continue to delete from database even if storage delete fails
+    if (storageError) {
+      console.error("Error deleting certificate from storage:", storageError);
+      // Continue to delete from database even if storage delete fails
+    }
   }
 
   // Delete from database using admin client to bypass RLS

@@ -50,6 +50,7 @@ export interface UserProfile {
   // Additional fields based on smart contract
   role: number; // 0 = Attendee, 1 = Organizer, 2 = Both (matches smart contract enum)
   certificates: string[]; // Array of certificate object IDs
+  is_admin: boolean; // Admin flag for platform administration
 }
 
 export interface UserProfileInsert {
@@ -63,6 +64,7 @@ export interface UserProfileInsert {
   popchain_account_address?: string | null;
   role: number;
   certificates?: string[];
+  is_admin?: boolean; // Defaults to false in database
 }
 
 export interface UserProfileUpdate {
@@ -75,6 +77,7 @@ export interface UserProfileUpdate {
   popchain_account_address?: string | null;
   role?: number;
   certificates?: string[];
+  is_admin?: boolean;
   updated_at?: string;
 }
 

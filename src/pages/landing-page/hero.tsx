@@ -1,6 +1,12 @@
 import Iridescence from "@/components/Iridescence";
 import { Button } from "@/components/ui/button";
-import { ArrowRight, CheckCircle2, Shield, Zap } from "lucide-react";
+import {
+  ArrowRight,
+  CheckCircle2,
+  Droplet,
+  QrCode,
+  Shield,
+} from "lucide-react";
 
 const Hero = () => {
   return (
@@ -39,7 +45,7 @@ const Hero = () => {
         </p>
 
         <div className="flex flex-col sm:flex-row gap-4 justify-center mb-12">
-          <a href="/register">
+          <a href="/login">
             <Button className="btn-gradient">
               Mint your moment <ArrowRight className="ml-2 w-5 h-5" />
             </Button>
@@ -59,8 +65,12 @@ const Hero = () => {
             <span>Immutable Proof</span>
           </div>
           <div className="flex items-center gap-2">
-            <Zap className="w-5 h-5 text-purple-400" />
+            <QrCode className="w-5 h-5 text-purple-400" />
             <span>QR Code Scanning</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <Droplet className="w-5 h-5 text-purple-400" />
+            <span>Powered by SUI</span>
           </div>
         </div>
       </div>

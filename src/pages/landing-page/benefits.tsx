@@ -13,9 +13,9 @@ const Benefits = () => {
             <ul className="space-y-4">
               {[
                 "Verifiable proof of attendance on blockchain",
-                "Instant NFT minting at event conclusion",
+                "Instant free Certificate minting at event end",
                 "Collectible tiered NFT certificates for achievements & recognition",
-                "Portable credentials across all platforms",
+                "Powered by SUI Blockchain",
                 "Fraud-proof and tamper-resistant",
                 "Perfect for conferences, seminars & educational events",
               ].map((benefit, idx) => (
