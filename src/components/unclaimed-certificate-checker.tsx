@@ -113,12 +113,21 @@ export function UnclaimedCertificateChecker() {
     setHasChecked(false); // Allow checking again if new certificate is added
   };
 
+  const handleClaimFailedNotWhitelisted = () => {
+    // Clear sessionStorage when claim fails because user is not whitelisted
+    clearUnclaimedCertificateId();
+    setCertificateId(null);
+    setIsDialogOpen(false);
+    setUserDismissed(false); // Reset dismissed flag
+    setHasChecked(false); // Allow checking again if new certificate is added
+  };
+
   const handleDialogClose = (open: boolean) => {
     // Update dialog open state
     setIsDialogOpen(open);
 
-    // If user closes dialog manually, mark as dismissed
-    // This prevents it from auto-opening again
+    // If user closes dialog via "Later" button, just mark as dismissed
+    // DO NOT clear session - session data remains
     if (!open) {
       setUserDismissed(true);
     }
@@ -140,6 +149,7 @@ export function UnclaimedCertificateChecker() {
       open={isDialogOpen}
       onOpenChange={handleDialogClose}
       onClaimed={handleClaimed}
+      onClaimFailedNotWhitelisted={() => handleClaimFailedNotWhitelisted()}
       suiClient={suiClient}
       certificate={certificate || undefined}
     />

@@ -5,7 +5,7 @@ import { hashEmailToBytes } from "@/utils/hash";
 import { FUNCTION_PATHS } from "@/lib/constants";
 import { extractAccountId } from "./onchain";
 import { networkConfig } from "@/configs/network-config";
-import { parseError } from "@/utils/errors";
+import { popchainErrorDecoder } from "@/utils/errors";
 
 /**
  * Map user type to smart contract role enum
@@ -346,13 +346,13 @@ export async function requestSponsoredAccountCreation(
       };
     }
 
-    // Parse error and get user-friendly message
+    // Use PopChain error decoder for user-friendly messages
     // Special handling for gas errors (keep existing behavior above)
-    const finalErrorMessage = parseError(error);
+    const parsedError = popchainErrorDecoder.parseError(error);
 
     return {
       success: false,
-      error: finalErrorMessage,
+      error: parsedError.message,
     };
   }
 }

@@ -4,6 +4,7 @@ import { FUNCTION_PATHS, PLATFORM_TREASURY_ADDRESS } from "@/lib/constants";
 import supabase from "@/utils/supabase";
 import type { Event, Whitelisting, WhitelistingInsert } from "@/types/database";
 import { hashEmail, hashEmailToBytes } from "@/utils/hash";
+import { popchainErrorDecoder } from "@/utils/errors";
 
 /**
  * Create a transaction to create an event with default tiers
@@ -92,41 +93,48 @@ export async function fetchOrganizerEvents(
 
 /**
  * Decode Sui string (stored as vector<u8> bytes)
- * @param bytes - Base64 encoded bytes or byte array
+ * @param bytes - Base64 encoded bytes, byte array, or nested structure
  * @returns Decoded string
  */
 function decodeSuiString(bytes: unknown): string {
-  if (typeof bytes === "string") {
-    try {
-      // If it's a base64 string, decode it
-      const decoded = atob(bytes);
-      return decoded;
-    } catch {
-      // If it's already a string, return as-is
-      return bytes;
-    }
+  if (bytes == null) return "";
+
+  // If already a Buffer, Uint8Array, or Array of numbers → decode as UTF-8
+  if (bytes instanceof Uint8Array || Array.isArray(bytes)) {
+    return new TextDecoder("utf-8").decode(Uint8Array.from(bytes));
   }
 
-  // Handle nested structure: { fields: { bytes: string } }
-  if (
-    bytes &&
-    typeof bytes === "object" &&
-    "fields" in bytes &&
-    typeof bytes.fields === "object" &&
-    bytes.fields !== null &&
-    "bytes" in bytes.fields
-  ) {
-    const byteString = (bytes.fields as { bytes: unknown }).bytes;
-    if (typeof byteString === "string") {
+  if (typeof bytes === "string") {
+    let str = bytes;
+
+    // Handle literal backslash escapes like \u0012
+    if (str.includes("\\u")) {
       try {
-        return atob(byteString);
+        str = JSON.parse(`"${str.replace(/"/g, '\\"')}"`);
       } catch {
-        return byteString;
+        /* ignore invalid escape sequences */
       }
     }
+
+    // Try Base64 decoding if it looks like base64
+    const base64Pattern = /^[A-Za-z0-9+/]+={0,2}$/;
+    if (base64Pattern.test(str) && str.length % 4 === 0) {
+      try {
+        const decoded = atob(str);
+        // Convert Latin-1 to proper UTF-8 string
+        return new TextDecoder("utf-8").decode(
+          Uint8Array.from(decoded, (c) => c.charCodeAt(0))
+        );
+      } catch {
+        // Not valid base64
+      }
+    }
+
+    return str;
   }
 
-  return "";
+  // Fallback
+  return String(bytes);
 }
 
 /**
@@ -340,9 +348,10 @@ export async function closeEvent(
     return { success: true, digest: result.digest };
   } catch (error) {
     console.error("Error closing event:", error);
+    const parsedError = popchainErrorDecoder.parseError(error);
     return {
       success: false,
-      error: error instanceof Error ? error.message : "Unknown error",
+      error: parsedError.message,
     };
   }
 }
@@ -395,9 +404,10 @@ export async function whitelistEmail(
     return { success: true, digest: result.digest };
   } catch (error) {
     console.error("Error whitelisting email:", error);
+    const parsedError = popchainErrorDecoder.parseError(error);
     return {
       success: false,
-      error: error instanceof Error ? error.message : "Unknown error",
+      error: parsedError.message,
     };
   }
 }
@@ -431,19 +441,23 @@ export async function removeFromWhitelist(
     const emailHash = hashEmail(email);
     // Normalize hash: lowercase and trim to ensure consistent matching
     const normalizedHash = emailHash.toLowerCase().trim();
-    
+
     const deleteResult = await deleteWhitelisting(eventId, normalizedHash);
     if (!deleteResult.success) {
-      console.error("Error deleting whitelisting from database:", deleteResult.error);
+      console.error(
+        "Error deleting whitelisting from database:",
+        deleteResult.error
+      );
       // Still return success since on-chain removal succeeded
     }
 
     return { success: true, digest: result.digest };
   } catch (error) {
     console.error("Error removing email from whitelist:", error);
+    const parsedError = popchainErrorDecoder.parseError(error);
     return {
       success: false,
-      error: error instanceof Error ? error.message : "Unknown error",
+      error: parsedError.message,
     };
   }
 }
@@ -545,38 +559,105 @@ export async function deleteWhitelisting(
 }
 
 /**
- * Check if an email is whitelisted for an event
- * @param eventId - Event ID from blockchain
- * @param emailHash - Email hash (normalized lowercase)
+ * Check if an email is whitelisted for an event on the blockchain
+ * @param eventId - Event object ID from blockchain
+ * @param emailHash - Email hash (hex string, normalized lowercase)
+ * @param suiClient - SuiClient instance
  * @returns true if whitelisted, false otherwise
  */
 export async function isEmailWhitelisted(
   eventId: string,
-  emailHash: string
+  emailHash: string,
+  suiClient: SuiClient
 ): Promise<boolean> {
   try {
     // Normalize hash: lowercase and trim to ensure consistent matching
     const normalizedHash = emailHash.toLowerCase().trim();
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data, error } = await (supabase.from("whitelistings") as any)
-      .select("id")
-      .eq("event_id", eventId)
-      .eq("email_hash", normalizedHash)
-      .single();
+    // Convert hex string to bytes array for the table key
+    // Email hash is stored as hex string, need to convert to bytes
+    const hashBytes = Uint8Array.from(
+      normalizedHash.match(/.{1,2}/g)?.map((byte) => parseInt(byte, 16)) || []
+    );
 
-    if (error) {
-      if (error.code === "PGRST116") {
-        // Not found - return false
-        return false;
-      }
-      console.error("Error checking whitelisting:", error);
+    // Get the event object to access the whitelist table
+    const eventObject = await suiClient.getObject({
+      id: eventId,
+      options: {
+        showContent: true,
+        showType: true,
+      },
+    });
+
+    if (
+      !eventObject.data ||
+      eventObject.error ||
+      !("content" in eventObject.data)
+    ) {
+      console.error("Event not found:", eventId);
       return false;
     }
 
-    return !!data;
+    const content = eventObject.data.content;
+    if (!content || !("fields" in content)) {
+      return false;
+    }
+
+    const fields = content.fields as Record<string, unknown>;
+
+    // Get the whitelist table ID
+    let whitelistTableId: string | null = null;
+    if (fields.whitelist) {
+      if (typeof fields.whitelist === "string") {
+        whitelistTableId = fields.whitelist;
+      } else if (
+        typeof fields.whitelist === "object" &&
+        fields.whitelist !== null &&
+        "fields" in fields.whitelist
+      ) {
+        const whitelistObj = fields.whitelist as Record<string, unknown>;
+        if (whitelistObj.id) {
+          if (typeof whitelistObj.id === "string") {
+            whitelistTableId = whitelistObj.id;
+          } else if (
+            typeof whitelistObj.id === "object" &&
+            whitelistObj.id !== null &&
+            "id" in whitelistObj.id
+          ) {
+            const idObj = whitelistObj.id as Record<string, unknown>;
+            if (typeof idObj.id === "string") {
+              whitelistTableId = idObj.id;
+            }
+          }
+        }
+      }
+    }
+
+    if (!whitelistTableId) {
+      console.error("Could not find whitelist table ID in event object");
+      return false;
+    }
+
+    // Try to get the dynamic field object for this email hash
+    // In Sui, table entries are stored as dynamic fields
+    // The key is the email hash bytes
+    try {
+      const dynamicField = await suiClient.getDynamicFieldObject({
+        parentId: whitelistTableId,
+        name: {
+          type: "vector<u8>",
+          value: Array.from(hashBytes),
+        },
+      });
+
+      // If the dynamic field exists, the email is whitelisted
+      return !!dynamicField.data && !dynamicField.error;
+    } catch {
+      // If getDynamicFieldObject throws or returns error, the key doesn't exist
+      return false;
+    }
   } catch (error) {
-    console.error("Error checking whitelisting:", error);
+    console.error("Error checking whitelisting on blockchain:", error);
     return false;
   }
 }

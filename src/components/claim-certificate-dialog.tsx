@@ -12,9 +12,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { toast } from "sonner";
 import type { Certificate } from "@/types/database";
 import type { Event } from "@/types/database";
-import { fetchEventById, isEmailWhitelisted } from "@/services/events";
-import { hashEmail } from "@/utils/hash";
-import { clearUnclaimedCertificateId } from "@/utils/unclaimed-certificate";
+import { getEventFromBlockchain } from "@/services/events";
 import {
   mintCertificateForAttendeeSponsored,
   getCertificateMintingData,
@@ -28,14 +26,15 @@ import {
 } from "@/lib/certificate-tiers";
 import { Badge } from "@/components/ui/badge";
 import { Gift } from "lucide-react";
-import { parseError } from "@/utils/errors";
-import { requestSponsoredAccountCreation } from "@/services/sponsored-transaction";
+import { popchainErrorDecoder } from "@/utils/errors";
+import { useNavigate } from "react-router";
 
 interface ClaimCertificateDialogProps {
   certificateId: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onClaimed?: () => void;
+  onClaimFailedNotWhitelisted?: () => void;
   suiClient: SuiClient;
   certificate?: Certificate | null; // Optional pre-fetched certificate
 }
@@ -45,17 +44,18 @@ export function ClaimCertificateDialog({
   open,
   onOpenChange,
   onClaimed,
+  onClaimFailedNotWhitelisted,
   suiClient,
   certificate: certificateProp,
 }: ClaimCertificateDialogProps) {
   const [event, setEvent] = useState<Event | null>(null);
   const [isClaiming, setIsClaiming] = useState(false);
   const { profile } = useAuth();
-
+  const navigate = useNavigate();
   // Use certificate from prop (parent manages fetching)
   const certificate = certificateProp || null;
 
-  // Fetch event when certificate becomes available
+  // Fetch event from blockchain when certificate becomes available
   useEffect(() => {
     if (!open || !certificateId) {
       return;
@@ -66,23 +66,38 @@ export function ClaimCertificateDialog({
       return;
     }
 
-    // Fetch event data (optional - certificate can be displayed without event)
+    // Fetch event data from blockchain (event_id is a blockchain object ID)
     const loadEvent = async () => {
       try {
-        const eventDataFetched = await fetchEventById(certificate.event_id);
-        setEvent(eventDataFetched);
-        // Silently handle missing event - it might not exist in DB or be blocked by RLS
-        // The certificate can still be claimed without event details
+        const blockchainEvent = await getEventFromBlockchain(
+          certificate.event_id,
+          suiClient
+        );
+
+        if (blockchainEvent) {
+          // Convert blockchain event to database Event format for compatibility
+          setEvent({
+            event_id: certificate.event_id,
+            organizer_id: "", // Not available from blockchain
+            organizer_account_address: blockchainEvent.organizerAccount,
+            name: blockchainEvent.name,
+            description: blockchainEvent.description,
+            active: blockchainEvent.active,
+            created_at: new Date().toISOString(), // Not available from blockchain
+            updated_at: new Date().toISOString(), // Not available from blockchain
+          } as Event);
+        } else {
+          setEvent(null);
+        }
       } catch (error) {
-        console.error("Error loading event data:", error);
-        // Silently handle errors - 406 errors are often RLS-related
-        // The certificate can still be displayed and claimed
+        console.error("Error loading event data from blockchain:", error);
+        // Silently handle errors - certificate can still be claimed without event details
         setEvent(null);
       }
     };
 
     loadEvent();
-  }, [open, certificateId, certificate]);
+  }, [open, certificateId, certificate, suiClient]);
 
   const handleClaim = async () => {
     if (!certificate || !profile) {
@@ -96,26 +111,6 @@ export function ClaimCertificateDialog({
     setIsClaiming(true);
 
     try {
-      // Check if user is still whitelisted before claiming
-      if (certificate.event_id && profile.email) {
-        const emailHash = hashEmail(profile.email);
-        const isWhitelisted = await isEmailWhitelisted(
-          certificate.event_id,
-          emailHash
-        );
-
-        if (!isWhitelisted) {
-          toast.error(
-            "You are no longer whitelisted for this event. Please contact the organizer."
-          );
-          // Clear unclaimed certificate from session
-          clearUnclaimedCertificateId();
-          onOpenChange(false);
-          setIsClaiming(false);
-          return;
-        }
-      }
-
       // Get minting data (try database first, fallback to blockchain)
       const mintingData = await getCertificateMintingData(
         certificate,
@@ -128,28 +123,9 @@ export function ClaimCertificateDialog({
       }
 
       // If user doesn't have a PopChain account, create one automatically
-      let attendeeAccountId: string = profile.popchain_account_address || "";
+      const attendeeAccountId = profile.popchain_account_address || "";
       if (!attendeeAccountId) {
-        const loadingToast = toast.loading("Creating your PopChain account...");
-
-        const accountResult = await requestSponsoredAccountCreation(
-          profile.email,
-          "attendee",
-          null
-        );
-
-        toast.dismiss(loadingToast);
-
-        if (!accountResult.success || !accountResult.accountId) {
-          toast.error(
-            accountResult.error ||
-              "Failed to create PopChain account. Please try again."
-          );
-          setIsClaiming(false);
-          return;
-        }
-
-        attendeeAccountId = accountResult.accountId;
+        navigate("/login");
       }
 
       // Use sponsored transaction - service wallet (treasury owner) signs and sponsors the transaction
@@ -168,17 +144,20 @@ export function ClaimCertificateDialog({
         onClaimed?.();
         onOpenChange(false);
       } else {
-        // Error message is already parsed and user-friendly from parseError
-        toast.error(result.error || "Failed to claim certificate");
+        // Decode the error to get error code and message
+        const parsedError = popchainErrorDecoder.parseError(result.error);
+
+        toast.error(parsedError.message);
+        onClaimFailedNotWhitelisted?.();
       }
     } catch (error) {
       console.error("Error claiming certificate:", error);
 
-      // Parse error and get user-friendly message
+      // Use the reusable PopChain error decoder
+      const parsedError = popchainErrorDecoder.parseError(error);
 
-      const errorMessage = parseError(error);
-
-      toast.error(errorMessage);
+      toast.error(parsedError.message);
+      onClaimFailedNotWhitelisted?.();
     } finally {
       setIsClaiming(false);
     }
@@ -188,6 +167,11 @@ export function ClaimCertificateDialog({
   if (!certificate) {
     return (
       <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogTitle className="sr-only">Unclaimed Certificate</DialogTitle>
+        <DialogDescription className="sr-only">
+          You have an unclaimed certificate ready to mint! Claim it to receive
+          your NFT certificate on-chain.
+        </DialogDescription>
         <DialogContent>
           <div className="flex items-center justify-center py-8">
             <Spinner className="w-6 h-6" />
@@ -196,8 +180,6 @@ export function ClaimCertificateDialog({
       </Dialog>
     );
   }
-
-  // Show certificate even if event is not found - event name is optional
 
   const tier = getTierByName(certificate.tier_name as TierName);
 
@@ -218,7 +200,7 @@ export function ClaimCertificateDialog({
         <div className="space-y-4 py-4">
           {/* Certificate Preview */}
           <div className="flex flex-col items-center gap-4">
-            <div className="relative aspect-[9/16] w-32 border rounded-lg overflow-hidden bg-muted">
+            <div className="relative border rounded-lg overflow-hidden bg-muted">
               <img
                 src={certificate.image_url}
                 alt={certificate.name || "Certificate"}
@@ -231,7 +213,12 @@ export function ClaimCertificateDialog({
                 {certificate.name || "Certificate"}
               </p>
               {event && (
-                <p className="text-sm text-muted-foreground">{event.name}</p>
+                <>
+                  <p>Event: {event.name}</p>
+                  <p className="text-sm text-muted-foreground">
+                    {event.description}
+                  </p>
+                </>
               )}
               {tier && (
                 <Badge variant="outline" className={getTierBadgeColor(tier)}>

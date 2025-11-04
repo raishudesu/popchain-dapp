@@ -23,7 +23,7 @@ import {
 } from "@/lib/certificate-tiers";
 import { linkWalletToAccount } from "@/services/wallet";
 import { transferCertificateToWallet } from "@/services/certificate-minting";
-import { parseError } from "@/utils/errors";
+import { popchainErrorDecoder } from "@/utils/errors";
 import supabase from "@/utils/supabase";
 
 export function MyCertificates() {
@@ -181,9 +181,9 @@ export function MyCertificates() {
     } catch (error) {
       console.error("Error transferring certificate:", error);
 
-      // Parse error and get user-friendly message
-      const errorMessage = parseError(error);
-      toast.error(errorMessage);
+      // Use PopChain error decoder for user-friendly message
+      const parsedError = popchainErrorDecoder.parseError(error);
+      toast.error(parsedError.message);
     } finally {
       setTransferringCertId(null);
     }
@@ -269,7 +269,7 @@ export function MyCertificates() {
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4 items-center justify-center">
             {certificateList.map((certificate) => (
               <div
                 key={certificate.objectId}

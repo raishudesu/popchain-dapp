@@ -2,7 +2,7 @@ import type { SuiClient } from "@mysten/sui/client";
 import { SUI_TYPE_ARG } from "@mysten/sui/utils";
 import { Transaction } from "@mysten/sui/transactions";
 import { FUNCTION_PATHS } from "@/lib/constants";
-import { parseError } from "@/utils/errors";
+import { popchainErrorDecoder } from "@/utils/errors";
 
 /**
  * Get the balance of a wallet address in SUI
@@ -163,13 +163,10 @@ export async function linkWalletToAccount(
     return { success: true, digest: result.digest };
   } catch (error) {
     console.error("Error linking wallet to account:", error);
-    
-    // Parse error and get user-friendly message
-    const errorMessage = parseError(error);
-
+    const parsedError = popchainErrorDecoder.parseError(error);
     return {
       success: false,
-      error: errorMessage,
+      error: parsedError.message,
     };
   }
 }

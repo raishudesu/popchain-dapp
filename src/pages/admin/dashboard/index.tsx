@@ -60,7 +60,7 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination";
-import { parseError } from "@/utils/errors";
+import { popchainErrorDecoder } from "@/utils/errors";
 
 const withdrawSchema = z.object({
   amount: z
@@ -189,8 +189,8 @@ const AdminDashboard = () => {
       refetchTransactions();
     } catch (error) {
       console.error("Withdraw error:", error);
-      const errorMessage = parseError(error);
-      toast.error(errorMessage);
+      const parsedError = popchainErrorDecoder.parseError(error);
+      toast.error(parsedError.message);
     } finally {
       setIsWithdrawing(false);
     }

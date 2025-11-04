@@ -714,13 +714,13 @@ const EventDetailsPage = () => {
               started.
             </p>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4 items-center justify-center">
               {customCertificates.map((certificate) => (
                 <div
                   key={certificate.id}
                   className="relative border rounded-lg overflow-hidden bg-muted group"
                 >
-                  <div className="aspect-[9/16] relative">
+                  <div className="relative">
                     <img
                       src={certificate.image_url}
                       alt={certificate.name || "Certificate"}
@@ -967,6 +967,7 @@ const EventDetailsPage = () => {
                 showDownloadButton={true}
                 downloadFileName={`certificate-${selectedCertificateForQR.id}-qr-code`}
                 skipLogoOnDownload={false}
+                logoUrl={selectedCertificateForQR.tier_image_url || undefined}
               />
               <Button
                 variant="outline"

@@ -8,7 +8,7 @@ import {
   deleteWhitelisting,
 } from "./events";
 import { getServiceWallet, getSuiClient } from "./sponsored-transaction";
-import { parseError } from "@/utils/errors";
+import { popchainErrorDecoder } from "@/utils/errors";
 import { hashEmail } from "@/utils/hash";
 
 /**
@@ -152,7 +152,7 @@ export async function mintCertificateForAttendeeSponsored(
   success: boolean;
   digest?: string;
   certificateId?: string;
-  error?: string;
+  error?: unknown;
 }> {
   try {
     // Verify certificate has all required data
@@ -235,12 +235,10 @@ export async function mintCertificateForAttendeeSponsored(
   } catch (error) {
     console.error("Error minting certificate:", error);
 
-    // Parse error and get user-friendly message
-    const errorMessage = parseError(error);
-
+    // Return the original error so the caller can decode it and extract error codes
     return {
       success: false,
-      error: errorMessage,
+      error: error,
     };
   }
 }
@@ -298,9 +296,10 @@ export async function mintCertificateForAttendee(
     return { success: true, digest: result.digest };
   } catch (error) {
     console.error("Error minting certificate:", error);
+    const parsedError = popchainErrorDecoder.parseError(error);
     return {
       success: false,
-      error: error instanceof Error ? error.message : "Unknown error",
+      error: parsedError.message,
     };
   }
 }
@@ -467,12 +466,12 @@ export async function transferCertificateToWallet(
   } catch (error) {
     console.error("Error transferring certificate to wallet:", error);
 
-    // Parse error and get user-friendly message
-    const errorMessage = parseError(error);
+    // Use the reusable PopChain error decoder
+    const parsedError = popchainErrorDecoder.parseError(error);
 
     return {
       success: false,
-      error: errorMessage,
+      error: parsedError.message,
     };
   }
 }
