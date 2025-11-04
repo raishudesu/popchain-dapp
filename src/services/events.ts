@@ -225,6 +225,105 @@ export function createAddToWhitelistTransaction(
 }
 
 /**
+ * Create a transaction to close an event
+ * @param eventId - Event object ID from blockchain
+ * @returns Transaction object
+ */
+export function createCloseEventTransaction(eventId: string): Transaction {
+  const tx = new Transaction();
+
+  tx.moveCall({
+    target: FUNCTION_PATHS.EVENT_CLOSE,
+    arguments: [
+      tx.object(eventId), // &mut Event
+    ],
+  });
+
+  return tx;
+}
+
+/**
+ * Update event active status in Supabase
+ * @param eventId - Event ID from blockchain
+ * @param active - Active status
+ * @returns Success status
+ */
+export async function updateEventActiveStatus(
+  eventId: string,
+  active: boolean
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error } = await (supabase.from("events") as any)
+      .update({ active })
+      .eq("event_id", eventId);
+
+    if (error) {
+      console.error("Error updating event status:", error);
+      return {
+        success: false,
+        error: error.message || "Failed to update event status",
+      };
+    }
+
+    return { success: true };
+  } catch (error) {
+    console.error("Error updating event status:", error);
+    return {
+      success: false,
+      error:
+        error instanceof Error
+          ? error.message
+          : "Failed to update event status",
+    };
+  }
+}
+
+/**
+ * Close an event (on-chain and in database)
+ * @param eventId - Event object ID from blockchain
+ * @param suiClient - SuiClient instance
+ * @param signAndExecute - Function to sign and execute transaction
+ * @returns Success status and transaction digest
+ */
+export async function closeEvent(
+  eventId: string,
+  suiClient: SuiClient,
+  signAndExecute: (params: {
+    transaction: Transaction;
+  }) => Promise<{ digest: string }>
+): Promise<{ success: boolean; digest?: string; error?: string }> {
+  try {
+    // Create and execute transaction
+    const tx = createCloseEventTransaction(eventId);
+    const result = await signAndExecute({ transaction: tx });
+
+    // Wait for transaction
+    await suiClient.waitForTransaction({
+      digest: result.digest,
+    });
+
+    // Update status in Supabase
+    const updateResult = await updateEventActiveStatus(eventId, false);
+    if (!updateResult.success) {
+      console.error(
+        "Failed to update event status in database:",
+        updateResult.error
+      );
+      // Still return success since on-chain update succeeded
+    }
+
+    return { success: true, digest: result.digest };
+  } catch (error) {
+    console.error("Error closing event:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Unknown error",
+    };
+  }
+}
+
+/**
  * Whitelist a single email address for an event
  * @param eventId - Event object ID from blockchain
  * @param email - Email address to whitelist

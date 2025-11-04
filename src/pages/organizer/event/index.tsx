@@ -18,6 +18,8 @@ import {
   Copy,
   Check,
   Plus,
+  X,
+  AlertTriangle,
 } from "lucide-react";
 import { toast } from "sonner";
 import type { Event } from "@/types/database";
@@ -26,6 +28,7 @@ import {
   fetchWhitelistingsWithNames,
   whitelistCSVEmails,
   whitelistEmail,
+  closeEvent,
   type WhitelistingWithName,
   type WhitelistingProgress,
 } from "@/services/events";
@@ -51,6 +54,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
@@ -89,6 +102,8 @@ const EventDetailsPage = () => {
   const [progress, setProgress] = useState<WhitelistingProgress | null>(null);
   const [singleEmail, setSingleEmail] = useState("");
   const [isAddingSingleEmail, setIsAddingSingleEmail] = useState(false);
+  const [showCloseEventDialog, setShowCloseEventDialog] = useState(false);
+  const [isClosingEvent, setIsClosingEvent] = useState(false);
   const suiClient = useSuiClient();
   const { mutateAsync: signAndExecute } = useSignAndExecuteTransaction();
   const account = useCurrentAccount();
@@ -171,6 +186,33 @@ const EventDetailsPage = () => {
       toast.error(errorMessage);
     } finally {
       setIsAddingSingleEmail(false);
+    }
+  };
+
+  const handleCloseEvent = async () => {
+    if (!eventId || !account) {
+      toast.error("Please ensure wallet is connected");
+      return;
+    }
+
+    setIsClosingEvent(true);
+    try {
+      const result = await closeEvent(eventId, suiClient, signAndExecute);
+
+      if (result.success) {
+        toast.success("Event closed successfully!");
+        setShowCloseEventDialog(false);
+        refetch(); // Refresh event data
+      } else {
+        toast.error(result.error || "Failed to close event");
+      }
+    } catch (error) {
+      console.error("Error closing event:", error);
+      const errorMessage =
+        error instanceof Error ? error.message : "Failed to close event";
+      toast.error(errorMessage);
+    } finally {
+      setIsClosingEvent(false);
     }
   };
 
@@ -308,11 +350,63 @@ const EventDetailsPage = () => {
   return (
     <div className="space-y-6 p-8">
       <BackButton />
-      <div>
-        <h1 className="text-3xl font-bold text-foreground mb-2">
-          {event.name}
-        </h1>
-        <p className="text-muted-foreground">{event.description}</p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold text-foreground mb-2">
+            {event.name}
+          </h1>
+          <p className="text-muted-foreground">{event.description}</p>
+        </div>
+        {event.active && (
+          <>
+            <Button
+              variant="destructive"
+              disabled={!account || isClosingEvent}
+              className="flex items-center gap-2"
+              onClick={() => setShowCloseEventDialog(true)}
+            >
+              <X className="w-4 h-4" />
+              Close Event
+            </Button>
+            <AlertDialog
+              open={showCloseEventDialog}
+              onOpenChange={setShowCloseEventDialog}
+            >
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle className="flex items-center gap-2">
+                    <AlertTriangle className="w-5 h-5 text-destructive" />
+                    Close Event
+                  </AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Are you sure you want to close this event? Once closed, no
+                    new certificates can be minted for this event. This action
+                    cannot be undone.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel disabled={isClosingEvent}>
+                    Cancel
+                  </AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={handleCloseEvent}
+                    disabled={isClosingEvent}
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  >
+                    {isClosingEvent ? (
+                      <>
+                        <Spinner className="w-4 h-4 mr-2" />
+                        Closing...
+                      </>
+                    ) : (
+                      "Close Event"
+                    )}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </>
+        )}
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Card>
@@ -320,6 +414,13 @@ const EventDetailsPage = () => {
             <CardTitle>Whitelist Attendees</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
+            {!event.active && (
+              <div className="p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
+                <p className="text-sm text-yellow-700 dark:text-yellow-400">
+                  This event is closed. You cannot add new whitelist entries.
+                </p>
+              </div>
+            )}
             <div className="space-y-2">
               <p className="text-sm text-muted-foreground">
                 Add a single email or upload a CSV file with attendee emails.
@@ -341,9 +442,18 @@ const EventDetailsPage = () => {
                   placeholder="attendee@example.com"
                   value={singleEmail}
                   onChange={(e) => setSingleEmail(e.target.value)}
-                  disabled={isAddingSingleEmail || isUploading || !account}
+                  disabled={
+                    isAddingSingleEmail ||
+                    isUploading ||
+                    !account ||
+                    !event.active
+                  }
                   onKeyDown={(e) => {
-                    if (e.key === "Enter" && !isAddingSingleEmail) {
+                    if (
+                      e.key === "Enter" &&
+                      !isAddingSingleEmail &&
+                      event.active
+                    ) {
                       handleAddSingleEmail();
                     }
                   }}
@@ -354,7 +464,8 @@ const EventDetailsPage = () => {
                     isAddingSingleEmail ||
                     isUploading ||
                     !account ||
-                    !singleEmail.trim()
+                    !singleEmail.trim() ||
+                    !event.active
                   }
                   className="btn-gradient"
                   size="icon"
@@ -377,13 +488,23 @@ const EventDetailsPage = () => {
                   type="file"
                   accept=".csv"
                   onChange={handleFileUpload}
-                  disabled={isUploading || isAddingSingleEmail || !account}
+                  disabled={
+                    isUploading ||
+                    isAddingSingleEmail ||
+                    !account ||
+                    !event.active
+                  }
                   className="hidden"
                   id="csv-upload"
                 />
                 <Button
                   onClick={() => fileInputRef.current?.click()}
-                  disabled={isUploading || isAddingSingleEmail || !account}
+                  disabled={
+                    isUploading ||
+                    isAddingSingleEmail ||
+                    !account ||
+                    !event.active
+                  }
                   className="btn-gradient"
                 >
                   <Upload className="w-4 h-4 mr-2" />
@@ -509,7 +630,7 @@ const EventDetailsPage = () => {
             <CardTitle>Certificates</CardTitle>
             <Button
               onClick={() => setShowCreateCertificateDialog(true)}
-              disabled={!user || isCreatingCertificate}
+              disabled={!user || isCreatingCertificate || !event.active}
               className="btn-gradient"
             >
               <Upload className="w-4 h-4 mr-2" />
@@ -518,6 +639,13 @@ const EventDetailsPage = () => {
           </div>
         </CardHeader>
         <CardContent>
+          {!event.active && (
+            <div className="mb-4 p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
+              <p className="text-sm text-yellow-700 dark:text-yellow-400">
+                This event is closed. You cannot create new certificates.
+              </p>
+            </div>
+          )}
           {certificatesLoading ? (
             <div className="flex items-center justify-center py-8">
               <Spinner className="w-6 h-6" />
