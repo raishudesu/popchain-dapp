@@ -1,7 +1,14 @@
 import { CheckCircle2 } from "lucide-react";
-import certImage from "@/assets/certificates/cert.png";
+import { useQuery } from "@tanstack/react-query";
+import { getDefaultCertificateOptions } from "@/services/certificates";
+import type { DefaultCertificateOption } from "@/services/certificates";
 
 const Benefits = () => {
+  const { data: certificates = [] } = useQuery<DefaultCertificateOption[]>({
+    queryKey: ["defaultCertificateOptions"],
+    queryFn: getDefaultCertificateOptions,
+  });
+
   return (
     <section id="benefits" className="py-20 px-4 sm:px-6 lg:px-8">
       <div className="max-w-6xl mx-auto">
@@ -29,11 +36,22 @@ const Benefits = () => {
               ))}
             </ul>
           </div>
-          <img
-            src={certImage}
-            alt="certificate-sample/"
-            className="rounded-xl shadow-2xl"
-          />
+          <div className="flex flex-col items-center">
+            <div className="grid grid-cols-2 gap-4 place-items-center">
+              {certificates.map((cert) => (
+                <img
+                  key={cert.index}
+                  src={cert.url}
+                  alt={`Certificate layout ${cert.index}`}
+                  className="rounded-xl shadow-2xl w-full max-w-48 h-auto"
+                />
+              ))}
+            </div>
+            <small className="text-muted-foreground text-center mt-2">
+              Here are some of our default certificate layouts. The organizer
+              can choose to use any of these layouts or upload their own.
+            </small>
+          </div>
         </div>
       </div>
     </section>

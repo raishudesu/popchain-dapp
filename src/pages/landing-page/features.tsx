@@ -18,7 +18,7 @@ const Features = () => {
           {features.map((feature, idx) => (
             <SpotlightCard
               key={idx}
-              className="custom-spotlight-card"
+              className="custom-spotlight-card shadow-lg"
               spotlightColor="rgba(236, 72, 153, 0.2)"
             >
               <div>

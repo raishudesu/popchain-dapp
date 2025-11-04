@@ -3,6 +3,7 @@ import {
   LayoutDashboard,
   LogOut,
   Settings,
+  Shield,
   User2,
 } from "lucide-react";
 
@@ -26,6 +27,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { CustomConnectButton } from "@/components/custom-connect-button";
 import { useAuth } from "@/contexts/auth-context";
+import { ModeToggle } from "@/components/mode-toggle";
 
 // Menu items.
 const items = [
@@ -42,7 +44,7 @@ const items = [
 ];
 
 export function AttendeeSidebar() {
-  const { signOut, user } = useAuth();
+  const { signOut, user, isAdmin } = useAuth();
 
   return (
     <Sidebar>
@@ -76,8 +78,32 @@ export function AttendeeSidebar() {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
+        {isAdmin && (
+          <SidebarGroup>
+            <SidebarGroupLabel>Other Dashboards</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                <SidebarMenuItem key="admin-dashboard">
+                  <SidebarMenuButton asChild>
+                    <a href="/admin/dashboard">
+                      <Shield />
+                      <span>Admin Dashboard</span>
+                    </a>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
       </SidebarContent>
       <SidebarFooter>
+        <SidebarGroup>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              <ModeToggle />
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
         <SidebarMenu>
           {/* Wallet Connect Button */}
           <SidebarMenuItem className="w-full mb-2">

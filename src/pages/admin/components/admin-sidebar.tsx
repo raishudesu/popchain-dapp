@@ -4,6 +4,8 @@ import {
   LogOut,
   Settings,
   User2,
+  Users,
+  UserCheck,
 } from "lucide-react";
 
 import {
@@ -27,6 +29,7 @@ import {
 import { CustomConnectButton } from "@/components/custom-connect-button";
 import { useAuth } from "@/contexts/auth-context";
 import { useNavigate } from "react-router";
+import { ModeToggle } from "@/components/mode-toggle";
 
 // Menu items.
 const items = [
@@ -43,7 +46,7 @@ const items = [
 ];
 
 export function AdminSidebar() {
-  const { signOut, user } = useAuth();
+  const { signOut, user, isOrganizer, isAttendee } = useAuth();
 
   const navigate = useNavigate();
 
@@ -88,8 +91,44 @@ export function AdminSidebar() {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
+        {(isOrganizer || isAttendee) && (
+          <SidebarGroup>
+            <SidebarGroupLabel>Other Dashboards</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {isOrganizer && (
+                  <SidebarMenuItem key="organizer-dashboard">
+                    <SidebarMenuButton asChild>
+                      <a href="/organizer/dashboard">
+                        <Users />
+                        <span>Organizer Dashboard</span>
+                      </a>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                )}
+                {isAttendee && (
+                  <SidebarMenuItem key="attendee-dashboard">
+                    <SidebarMenuButton asChild>
+                      <a href="/attendee/dashboard">
+                        <UserCheck />
+                        <span>Attendee Dashboard</span>
+                      </a>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                )}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
       </SidebarContent>
       <SidebarFooter>
+        <SidebarGroup>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              <ModeToggle />
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
         <SidebarMenu>
           {/* Wallet Connect Button */}
           <SidebarMenuItem className="w-full mb-2">

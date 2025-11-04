@@ -41,7 +41,7 @@ const Tiers = () => {
             return (
               <SpotlightCard
                 key={idx}
-                className="custom-spotlight-card"
+                className="custom-spotlight-card shadow-lg"
                 spotlightColor={spotlightColors[idx]}
               >
                 <div className="flex flex-col items-center justify-center">
