@@ -37,53 +37,44 @@ export function ProtectedRoute({ requiredRole }: ProtectedRouteProps) {
   }
 
   if (requiredRole) {
-    // Admins should only have access to admin routes
-    if (isAdmin && requiredRole !== "admin") {
-      return <Navigate to="/admin/dashboard" replace />;
-    }
-
-    // Non-admins trying to access admin routes should be redirected
-    if (requiredRole === "admin" && !isAdmin) {
-      // Redirect based on user's actual role
-      if (isOrganizer && !isAttendee) {
-        return <Navigate to="/organizer/dashboard" replace />;
-      } else if (isAttendee && !isOrganizer) {
-        return <Navigate to="/attendee/dashboard" replace />;
-      } else if (isOrganizer && isAttendee) {
-        // User has both roles, redirect to organizer by default
-        return <Navigate to="/organizer/dashboard" replace />;
-      } else {
-        return <Navigate to="/" replace />;
-      }
-    }
-
-    // Check role-based access for non-admin routes
+    // Check role-based access
     let hasAccess = false;
 
     switch (requiredRole) {
       case "admin":
+        // Only admins can access admin routes
         hasAccess = isAdmin;
         break;
       case "organizer":
-        hasAccess = isOrganizer;
+        // Organizers can access (if not admin)
+        // Admin+organizer can access (even if also attendee, they can access organizer)
+        // Admin+attendee (without organizer role) cannot access organizer routes
+        hasAccess = (isOrganizer && !isAdmin) || (isAdmin && isOrganizer);
         break;
       case "attendee":
-        hasAccess = isAttendee;
+        // Attendees can access (if not admin)
+        // Admin+attendee can access (even if also organizer, they can access attendee)
+        // Admin+organizer (without attendee role) cannot access attendee routes
+        hasAccess = (isAttendee && !isAdmin) || (isAdmin && isAttendee);
         break;
     }
 
     if (!hasAccess) {
       // Redirect based on user's actual role
+      // If user is admin, redirect to admin dashboard
       if (isAdmin) {
         return <Navigate to="/admin/dashboard" replace />;
       } else if (isOrganizer && !isAttendee) {
+        // Only organizer, redirect to organizer dashboard
         return <Navigate to="/organizer/dashboard" replace />;
       } else if (isAttendee && !isOrganizer) {
+        // Only attendee, redirect to attendee dashboard
         return <Navigate to="/attendee/dashboard" replace />;
       } else if (isOrganizer && isAttendee) {
-        // User has both roles, redirect to organizer by default
+        // User has both roles (but not admin), redirect to organizer by default
         return <Navigate to="/organizer/dashboard" replace />;
       } else {
+        // No role found, redirect to home
         return <Navigate to="/" replace />;
       }
     }

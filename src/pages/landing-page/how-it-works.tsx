@@ -15,7 +15,7 @@ const HowItWorks = () => {
         <div className="grid md:grid-cols-4 gap-6">
           {howItWorks.map((item, idx) => (
             <SpotlightCard
-              className="custom-spotlight-card"
+              className="custom-spotlight-card shadow-lg"
               spotlightColor="rgba(236, 72, 153, 0.2)"
             >
               <div key={idx} className="relative text-center">

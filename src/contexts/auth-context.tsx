@@ -76,14 +76,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const profile = profileData ?? null;
 
-  // Check if user is admin (you may need to adjust this logic based on your admin requirements)
-  // For now, we'll check if the user has a special email or metadata field
-  const isAdmin =
-    profile?.email === import.meta.env.VITE_ADMIN_EMAIL ||
-    (profile &&
-      "is_admin" in profile &&
-      (profile as UserProfile & { is_admin?: boolean }).is_admin === true) ||
-    false;
+  // Check if user is admin (check both is_admin field and VITE_ADMIN_EMAIL)
+  const isAdmin = profile?.is_admin ?? false;
 
   // Check roles based on profile.role
   // role: 0 = Attendee, 1 = Organizer, 2 = Both
