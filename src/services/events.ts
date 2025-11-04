@@ -304,16 +304,16 @@ export async function fetchEventById(eventId: string): Promise<Event | null> {
 }
 
 /**
- * Whitelisting with associated user name from user_profiles
+ * Whitelisting with associated user name from user_profiles (kept for backward compatibility)
  */
 export interface WhitelistingWithName extends Whitelisting {
-  name?: string; // First name + last name if matched in user_profiles
+  name?: string; // First name + last name if matched in user_profiles (not used anymore)
 }
 
 /**
- * Fetch whitelistings for an event and match them with user profile names
+ * Fetch whitelistings for an event
  * @param eventId - Event ID to fetch whitelistings for
- * @returns Array of whitelistings with optional name field
+ * @returns Array of whitelistings
  */
 export async function fetchWhitelistingsWithNames(
   eventId: string
@@ -331,84 +331,7 @@ export async function fetchWhitelistingsWithNames(
     return [];
   }
 
-  const typedWhitelistings = whitelistings as Whitelisting[];
-
-  // Get all unique email hashes from whitelistings (normalize to lowercase and trim)
-  const emailHashes = Array.from(
-    new Set(
-      typedWhitelistings
-        .map((w) => (w.email_hash || "").toLowerCase().trim())
-        .filter(Boolean)
-    )
-  );
-
-  if (emailHashes.length === 0) {
-    return typedWhitelistings.map((w) => ({ ...w, name: undefined }));
-  }
-
-  // Fetch ALL user profiles and match in JavaScript for more reliable matching
-  // This avoids potential issues with Supabase's .in() query not finding matches
-  const { data: allProfiles, error: profilesError } =
-    await // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (supabase.from("user_profiles") as any).select(
-      "email_hash, first_name, last_name"
-    );
-
-  if (profilesError) {
-    console.error("Error fetching profiles:", profilesError);
-  }
-
-  // Create a Set for fast lookup of whitelisting hashes
-  const emailHashSet = new Set(emailHashes);
-
-  // Create a map of email_hash -> name (normalized to lowercase)
-  // Match by normalizing both sides and only include profiles that match our whitelistings
-  const nameMap = new Map<string, string>();
-
-  if (allProfiles && Array.isArray(allProfiles)) {
-    for (const profile of allProfiles as Array<{
-      email_hash: string;
-      first_name: string;
-      last_name: string;
-    }>) {
-      // Normalize hash: lowercase and trim
-      const normalizedHash = (profile.email_hash || "").toLowerCase().trim();
-
-      // Only add to map if this hash is in our whitelistings set (and not already added)
-      if (
-        normalizedHash &&
-        emailHashSet.has(normalizedHash) &&
-        !nameMap.has(normalizedHash)
-      ) {
-        const fullName = `${profile.first_name || ""} ${
-          profile.last_name || ""
-        }`.trim();
-
-        // Add to map even if name is empty - we'll show email or "Registered" as fallback
-        // This ensures we know the profile exists even without a name
-        if (fullName) {
-          nameMap.set(normalizedHash, fullName);
-        } else {
-          // Mark as registered even without name (use a special marker)
-          nameMap.set(normalizedHash, "Registered"); // Special marker for registered but no name
-        }
-      }
-    }
-  }
-
-  // Combine whitelistings with names (normalize hash for lookup)
-  return typedWhitelistings.map((whitelisting) => {
-    // Normalize hash: lowercase and trim
-    const normalizedHash = (whitelisting.email_hash || "").toLowerCase().trim();
-    const matchedName = normalizedHash
-      ? nameMap.get(normalizedHash)
-      : undefined;
-
-    return {
-      ...whitelisting,
-      name: matchedName,
-    };
-  });
+  return whitelistings as WhitelistingWithName[];
 }
 
 /**

@@ -203,13 +203,17 @@ export function RegistrationStepper() {
         // No wallet connected - use sponsored transaction (admin pays gas)
         // This is allowed for attendees
         if (data.userType === "attendee") {
-          toast.loading("Creating your on-chain account (sponsored)...");
+          const loadingToast = toast.loading(
+            "Creating your on-chain account (sponsored)..."
+          );
 
           const sponsoredResult = await requestSponsoredAccountCreation(
             data.email,
             data.userType,
             null // No wallet address for attendees without wallet
           );
+
+          toast.dismiss(loadingToast);
 
           if (!sponsoredResult.success || !sponsoredResult.accountId) {
             toast.error(
@@ -232,13 +236,15 @@ export function RegistrationStepper() {
       }
 
       // Step 2: Create Supabase account with the on-chain account address
-      toast.loading("Completing registration...");
+      const loadingToast2 = toast.loading("Completing registration...");
 
       const registrationResult = await registerUser(
         data,
         walletAddress,
         accountId
       );
+
+      toast.dismiss(loadingToast2);
 
       if (registrationResult.success) {
         toast.success(

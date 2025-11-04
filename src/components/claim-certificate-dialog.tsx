@@ -27,6 +27,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Gift } from "lucide-react";
 import { parseError } from "@/utils/errors";
+import { requestSponsoredAccountCreation } from "@/services/sponsored-transaction";
 
 interface ClaimCertificateDialogProps {
   certificateId: string;
@@ -89,14 +90,6 @@ export function ClaimCertificateDialog({
 
     // Event is optional for claiming - we only need certificate and profile
 
-    // Check if user has PopChain account
-    if (!profile.popchain_account_address) {
-      toast.error(
-        "You need to create a PopChain account first. Please complete your registration."
-      );
-      return;
-    }
-
     // Wallet connection not needed - transaction is sponsored by organizer via service wallet
     setIsClaiming(true);
 
@@ -112,13 +105,38 @@ export function ClaimCertificateDialog({
         );
       }
 
+      // If user doesn't have a PopChain account, create one automatically
+      let attendeeAccountId: string = profile.popchain_account_address || "";
+      if (!attendeeAccountId) {
+        const loadingToast = toast.loading("Creating your PopChain account...");
+
+        const accountResult = await requestSponsoredAccountCreation(
+          profile.email,
+          "attendee",
+          null
+        );
+
+        toast.dismiss(loadingToast);
+
+        if (!accountResult.success || !accountResult.accountId) {
+          toast.error(
+            accountResult.error ||
+              "Failed to create PopChain account. Please try again."
+          );
+          setIsClaiming(false);
+          return;
+        }
+
+        attendeeAccountId = accountResult.accountId;
+      }
+
       // Use sponsored transaction - service wallet (treasury owner) signs and sponsors the transaction
       // The organizer's PopChainAccount will be charged the minting fee via charge_platform_fee
       // Attendee doesn't need wallet connected - transaction is fully sponsored by platform owner
       const result = await mintCertificateForAttendeeSponsored(
         certificate,
         mintingData.organizerAccountId,
-        profile.popchain_account_address,
+        attendeeAccountId,
         suiClient
       );
 
@@ -202,15 +220,6 @@ export function ClaimCertificateDialog({
               )}
             </div>
           </div>
-
-          {!profile?.popchain_account_address && (
-            <div className="p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
-              <p className="text-sm text-yellow-700 dark:text-yellow-400">
-                You need to create a PopChain account before claiming. Please
-                complete your registration.
-              </p>
-            </div>
-          )}
         </div>
 
         <DialogFooter>
@@ -223,7 +232,7 @@ export function ClaimCertificateDialog({
           </Button>
           <Button
             onClick={handleClaim}
-            disabled={isClaiming || !profile?.popchain_account_address}
+            disabled={isClaiming}
             className="btn-gradient"
           >
             {isClaiming ? (

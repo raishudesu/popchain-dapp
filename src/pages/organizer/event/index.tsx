@@ -17,6 +17,7 @@ import {
   QrCode,
   Copy,
   Check,
+  Plus,
 } from "lucide-react";
 import { toast } from "sonner";
 import type { Event } from "@/types/database";
@@ -24,6 +25,7 @@ import {
   fetchEventById,
   fetchWhitelistingsWithNames,
   whitelistCSVEmails,
+  whitelistEmail,
   type WhitelistingWithName,
   type WhitelistingProgress,
 } from "@/services/events";
@@ -85,6 +87,8 @@ const EventDetailsPage = () => {
     useState<Certificate | null>(null);
   const [copiedLink, setCopiedLink] = useState(false);
   const [progress, setProgress] = useState<WhitelistingProgress | null>(null);
+  const [singleEmail, setSingleEmail] = useState("");
+  const [isAddingSingleEmail, setIsAddingSingleEmail] = useState(false);
   const suiClient = useSuiClient();
   const { mutateAsync: signAndExecute } = useSignAndExecuteTransaction();
   const account = useCurrentAccount();
@@ -129,6 +133,46 @@ const EventDetailsPage = () => {
     queryFn: () => (eventId ? fetchCertificatesByEventId(eventId) : []),
     enabled: !!eventId,
   });
+
+  const handleAddSingleEmail = async () => {
+    if (!singleEmail.trim() || !eventId || !account) {
+      toast.error("Please enter a valid email and ensure wallet is connected");
+      return;
+    }
+
+    // Basic email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(singleEmail.trim())) {
+      toast.error("Please enter a valid email address");
+      return;
+    }
+
+    setIsAddingSingleEmail(true);
+    try {
+      const result = await whitelistEmail(
+        eventId,
+        singleEmail.trim(),
+        suiClient,
+        signAndExecute
+      );
+
+      if (result.success) {
+        toast.success(`Email ${singleEmail.trim()} whitelisted successfully!`);
+        setSingleEmail("");
+        refetch(); // Refresh event data
+        refetchWhitelistings(); // Refresh whitelistings table
+      } else {
+        toast.error(result.error || "Failed to whitelist email");
+      }
+    } catch (error) {
+      console.error("Error whitelisting email:", error);
+      const errorMessage =
+        error instanceof Error ? error.message : "Failed to whitelist email";
+      toast.error(errorMessage);
+    } finally {
+      setIsAddingSingleEmail(false);
+    }
+  };
 
   const handleFileUpload = async (
     event: React.ChangeEvent<HTMLInputElement>
@@ -278,37 +322,79 @@ const EventDetailsPage = () => {
           <CardContent className="space-y-4">
             <div className="space-y-2">
               <p className="text-sm text-muted-foreground">
-                Upload a CSV file with attendee emails. Each email will be
-                whitelisted on-chain and recorded in the database.
+                Add a single email or upload a CSV file with attendee emails.
+                Each email will be whitelisted on-chain and recorded in the
+                database.
               </p>
               <p className="text-xs text-muted-foreground">
                 CSV format: One email per line, or emails in the first column
               </p>
             </div>
 
-            <div className="flex items-center gap-4">
-              <Input
-                ref={fileInputRef}
-                type="file"
-                accept=".csv"
-                onChange={handleFileUpload}
-                disabled={isUploading || !account}
-                className="hidden"
-                id="csv-upload"
-              />
-              <Button
-                onClick={() => fileInputRef.current?.click()}
-                disabled={isUploading || !account}
-                className="btn-gradient"
-              >
-                <Upload className="w-4 h-4 mr-2" />
-                {isUploading ? "Processing..." : "Upload CSV"}
-              </Button>
-              {!account && (
-                <p className="text-sm text-muted-foreground">
-                  Please connect your wallet to whitelist emails
-                </p>
-              )}
+            {/* Single Email Input */}
+            <div className="space-y-2">
+              <Label htmlFor="single-email">Add Single Email</Label>
+              <div className="flex items-center gap-2">
+                <Input
+                  id="single-email"
+                  type="email"
+                  placeholder="attendee@example.com"
+                  value={singleEmail}
+                  onChange={(e) => setSingleEmail(e.target.value)}
+                  disabled={isAddingSingleEmail || isUploading || !account}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !isAddingSingleEmail) {
+                      handleAddSingleEmail();
+                    }
+                  }}
+                />
+                <Button
+                  onClick={handleAddSingleEmail}
+                  disabled={
+                    isAddingSingleEmail ||
+                    isUploading ||
+                    !account ||
+                    !singleEmail.trim()
+                  }
+                  className="btn-gradient"
+                  size="icon"
+                >
+                  {isAddingSingleEmail ? (
+                    <Spinner className="w-4 h-4" />
+                  ) : (
+                    <Plus className="w-4 h-4" />
+                  )}
+                </Button>
+              </div>
+            </div>
+
+            {/* CSV Upload */}
+            <div className="space-y-2">
+              <Label htmlFor="csv-upload">Bulk Upload (CSV)</Label>
+              <div className="flex items-center gap-4">
+                <Input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".csv"
+                  onChange={handleFileUpload}
+                  disabled={isUploading || isAddingSingleEmail || !account}
+                  className="hidden"
+                  id="csv-upload"
+                />
+                <Button
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isUploading || isAddingSingleEmail || !account}
+                  className="btn-gradient"
+                >
+                  <Upload className="w-4 h-4 mr-2" />
+                  {isUploading ? "Processing..." : "Upload CSV"}
+                </Button>
+                {!account && (
+                  <p className="text-sm text-muted-foreground">
+                    Please connect your wallet to whitelist emails
+                  </p>
+                )}
+              </div>
             </div>
 
             {progress && progress.total > 0 && (
@@ -395,7 +481,6 @@ const EventDetailsPage = () => {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Name</TableHead>
                     <TableHead>Email</TableHead>
                     <TableHead>Whitelisted</TableHead>
                   </TableRow>
@@ -403,13 +488,6 @@ const EventDetailsPage = () => {
                 <TableBody>
                   {whitelistings.map((whitelisting) => (
                     <TableRow key={whitelisting.id}>
-                      <TableCell>
-                        {whitelisting.name || (
-                          <span className="text-muted-foreground">
-                            Not registered
-                          </span>
-                        )}
-                      </TableCell>
                       <TableCell className="font-mono text-sm">
                         {whitelisting.email}
                       </TableCell>

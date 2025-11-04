@@ -28,25 +28,9 @@ function getUserRole(userType: "organizer" | "attendee"): number {
  */
 export function getServiceWallet(): Ed25519Keypair | null {
   const privateKeyEnv = import.meta.env.VITE_SERVICE_WALLET_PRIVATE_KEY;
-  const passphraseEnv = import.meta.env.VITE_SERVICE_WALLET_PASSPHRASE;
 
   if (!privateKeyEnv) {
-    console.warn(
-      "Service wallet not configured. Set VITE_SERVICE_WALLET_PRIVATE_KEY in .env file"
-    );
-    console.warn(
-      "Note: After adding .env variables, restart your dev server (npm run dev)"
-    );
     return null;
-  }
-
-  // Note: Sui Slush wallet exports typically require you to enter the passphrase
-  // during export, and then give you the decrypted private key.
-  // The VITE_SERVICE_WALLET_PASSPHRASE is for future use if needed.
-  if (passphraseEnv) {
-    console.log(
-      "Note: Passphrase is set, but Sui wallet exports are usually already decrypted."
-    );
   }
 
   try {
@@ -60,47 +44,19 @@ export function getServiceWallet(): Ed25519Keypair | null {
         // Ed25519Keypair.fromSecretKey() handles Bech32 strings directly!
         // It automatically decodes the Bech32 format
         const keypair = Ed25519Keypair.fromSecretKey(cleaned);
-        const address = keypair.toSuiAddress();
-
-        console.log("Private key loaded from Bech32 format:", {
-          format: "bech32",
-          address,
-          matches: address === expectedAddress ? "✓ MATCH!" : "✗ no match",
-        });
-
-        if (address === expectedAddress) {
-          console.log(
-            "✓ Successfully loaded service wallet from Bech32 format!"
-          );
-          return keypair;
-        } else {
-          console.warn(
-            `⚠️ Address mismatch!\n` +
-              `Expected: ${expectedAddress}\n` +
-              `Got:      ${address}\n` +
-              `Please verify your VITE_SERVICE_WALLET_PRIVATE_KEY is correct.`
-          );
-          // Still return it - might be a different key
-          return keypair;
-        }
-      } catch (bech32Error) {
-        console.error(
-          "Failed to decode Bech32 private key. Please check the format.",
-          bech32Error
-        );
+        return keypair;
+      } catch {
         return null;
       }
     }
 
     // Handle other formats (base64, hex)
     let privateKeyBytes: Uint8Array;
-    let decodedFormat: string = "";
 
     // Try to parse as base64 first
     try {
       privateKeyBytes = Uint8Array.from(atob(cleaned), (c) => c.charCodeAt(0));
-      decodedFormat = "base64";
-    } catch (base64Error) {
+    } catch {
       // If base64 fails, try hex format
       try {
         const hexCleaned = cleaned.replace(/^0x/, "");
@@ -109,24 +65,10 @@ export function getServiceWallet(): Ed25519Keypair | null {
             .match(/.{1,2}/g)
             ?.map((byte: string) => parseInt(byte, 16)) || []
         );
-        decodedFormat = "hex";
-      } catch (hexError) {
-        console.error(
-          "Failed to parse service wallet private key. Expected Bech32 (suiprivkey1...), base64, or hex format.",
-          { base64Error, hexError }
-        );
+      } catch {
         return null;
       }
     }
-
-    // Debug: Log what we decoded
-    console.log("Private key decoded:", {
-      format: decodedFormat,
-      length: privateKeyBytes.length,
-      firstBytes: Array.from(privateKeyBytes.slice(0, 8))
-        .map((b) => b.toString(16).padStart(2, "0"))
-        .join(""),
-    });
 
     // Ed25519 keypair can accept different secret key formats
     // Try different extraction methods and verify against expected address
@@ -175,15 +117,7 @@ export function getServiceWallet(): Ed25519Keypair | null {
         const keypair = Ed25519Keypair.fromSecretKey(keyBytes);
         const address = keypair.toSuiAddress();
 
-        console.log(`Tried "${method.name}" (${keyBytes.length} bytes):`, {
-          address,
-          matches: address === expectedAddress ? "✓ MATCH!" : "✗ no match",
-        });
-
         if (address === expectedAddress) {
-          console.log(
-            `✓ Successfully loaded service wallet with method: "${method.name}"`
-          );
           return keypair;
         }
       } catch {
@@ -192,50 +126,18 @@ export function getServiceWallet(): Ed25519Keypair | null {
       }
     }
 
-    // If we get here, none matched - use the most likely format and warn
-    console.warn(
-      `⚠️ Could not find key extraction method that matches expected address.\n` +
-        `Expected: ${expectedAddress}\n` +
-        `Trying default method (last 32 bytes)...`
-    );
-
+    // If we get here, none matched - use the most likely format
     try {
       const defaultKey =
         privateKeyBytes.length >= 32
           ? privateKeyBytes.slice(-32)
           : privateKeyBytes;
       const keypair = Ed25519Keypair.fromSecretKey(defaultKey);
-      const actualAddress = keypair.toSuiAddress();
-
-      console.warn(
-        `Loaded keypair but address doesn't match!\n` +
-          `Expected: ${expectedAddress}\n` +
-          `Got:      ${actualAddress}\n\n` +
-          `This suggests:\n` +
-          `1. The private key format from Sui Slush wallet might need special parsing\n` +
-          `2. Or the key in VITE_SERVICE_WALLET_PRIVATE_KEY might not match the expected address\n\n` +
-          `Please verify:\n` +
-          `- Export the private key from Sui Slush wallet again\n` +
-          `- Ensure it's in base64 or hex format\n` +
-          `- Check if Slush uses a different key derivation path or format`
-      );
-
-      // Return it anyway but with warning
       return keypair;
-    } catch (error) {
-      console.error(
-        `Failed to create keypair from private key.\n` +
-          `Key length: ${privateKeyBytes.length} bytes\n` +
-          `Expected address: ${expectedAddress}\n` +
-          `Error: ${error instanceof Error ? error.message : String(error)}`
-      );
+    } catch {
       return null;
     }
-  } catch (error) {
-    console.error("Failed to load service wallet:", error);
-    console.error(
-      "Please check that VITE_SERVICE_WALLET_PRIVATE_KEY is correctly formatted (base64 or hex)"
-    );
+  } catch {
     return null;
   }
 }
@@ -349,12 +251,6 @@ export async function requestSponsoredAccountCreation(
 
     const walletAddress = serviceWallet.toSuiAddress();
 
-    // Log wallet address for debugging (can be removed in production)
-    console.log("Service wallet address:", walletAddress);
-    console.log(
-      "If this address is unexpected, check your VITE_SERVICE_WALLET_PRIVATE_KEY in .env"
-    );
-
     // Check balance before attempting transaction
     const balanceCheck = await checkServiceWalletBalance();
     if (!balanceCheck.hasBalance) {
@@ -425,8 +321,6 @@ export async function requestSponsoredAccountCreation(
       accountId,
     };
   } catch (error) {
-    console.error("Sponsored transaction error:", error);
-
     // Check for gas-related errors
     const errorMessage = error instanceof Error ? error.message : String(error);
 
