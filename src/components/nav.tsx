@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useLocation } from "react-router";
 import { LogOut } from "lucide-react";
 import { ModeToggle } from "./mode-toggle";
 import { Button } from "./ui/button";
@@ -9,6 +10,8 @@ import { useAuth } from "@/contexts/auth-context";
 const Nav = () => {
   const [open, setOpen] = useState(false);
   const { user, signOut } = useAuth();
+  const location = useLocation();
+  const isRegisterPage = location.pathname === "/register";
 
   const navLinks = [
     { href: "/#home", label: "Home" },
@@ -67,7 +70,7 @@ const Nav = () => {
               <Button className="btn-gradient">Get Started</Button>
             </a>
           )}
-          <NavConnectButton />
+          {isRegisterPage && <NavConnectButton />}
         </div>
         <div className="lg:hidden">
           <MobileMenuSheet

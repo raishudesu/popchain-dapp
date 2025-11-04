@@ -32,7 +32,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { useAuth } from "@/contexts/auth-context";
 import supabase from "@/utils/supabase";
 import type { EventInsert } from "@/types/database";
-import { parseError } from "@/utils/errors";
+import { popchainErrorDecoder } from "@/utils/errors";
 
 const eventSchema = z.object({
   name: z
@@ -167,10 +167,9 @@ export function CreateEventDialog({
     } catch (error) {
       console.error("Create event error:", error);
 
-      // Parse error and get user-friendly message
-      const errorMessage = parseError(error);
-
-      toast.error(errorMessage);
+      // Use PopChain error decoder for user-friendly message
+      const parsedError = popchainErrorDecoder.parseError(error);
+      toast.error(parsedError.message);
     } finally {
       setIsCreating(false);
     }

@@ -4,6 +4,7 @@ import { FUNCTION_PATHS, PLATFORM_TREASURY_ADDRESS } from "@/lib/constants";
 import supabase from "@/utils/supabase";
 import type { Event, Whitelisting, WhitelistingInsert } from "@/types/database";
 import { hashEmail, hashEmailToBytes } from "@/utils/hash";
+import { popchainErrorDecoder } from "@/utils/errors";
 
 /**
  * Create a transaction to create an event with default tiers
@@ -92,41 +93,48 @@ export async function fetchOrganizerEvents(
 
 /**
  * Decode Sui string (stored as vector<u8> bytes)
- * @param bytes - Base64 encoded bytes or byte array
+ * @param bytes - Base64 encoded bytes, byte array, or nested structure
  * @returns Decoded string
  */
 function decodeSuiString(bytes: unknown): string {
-  if (typeof bytes === "string") {
-    try {
-      // If it's a base64 string, decode it
-      const decoded = atob(bytes);
-      return decoded;
-    } catch {
-      // If it's already a string, return as-is
-      return bytes;
-    }
+  if (bytes == null) return "";
+
+  // If already a Buffer, Uint8Array, or Array of numbers → decode as UTF-8
+  if (bytes instanceof Uint8Array || Array.isArray(bytes)) {
+    return new TextDecoder("utf-8").decode(Uint8Array.from(bytes));
   }
 
-  // Handle nested structure: { fields: { bytes: string } }
-  if (
-    bytes &&
-    typeof bytes === "object" &&
-    "fields" in bytes &&
-    typeof bytes.fields === "object" &&
-    bytes.fields !== null &&
-    "bytes" in bytes.fields
-  ) {
-    const byteString = (bytes.fields as { bytes: unknown }).bytes;
-    if (typeof byteString === "string") {
+  if (typeof bytes === "string") {
+    let str = bytes;
+
+    // Handle literal backslash escapes like \u0012
+    if (str.includes("\\u")) {
       try {
-        return atob(byteString);
+        str = JSON.parse(`"${str.replace(/"/g, '\\"')}"`);
       } catch {
-        return byteString;
+        /* ignore invalid escape sequences */
       }
     }
+
+    // Try Base64 decoding if it looks like base64
+    const base64Pattern = /^[A-Za-z0-9+/]+={0,2}$/;
+    if (base64Pattern.test(str) && str.length % 4 === 0) {
+      try {
+        const decoded = atob(str);
+        // Convert Latin-1 to proper UTF-8 string
+        return new TextDecoder("utf-8").decode(
+          Uint8Array.from(decoded, (c) => c.charCodeAt(0))
+        );
+      } catch {
+        // Not valid base64
+      }
+    }
+
+    return str;
   }
 
-  return "";
+  // Fallback
+  return String(bytes);
 }
 
 /**
@@ -225,6 +233,130 @@ export function createAddToWhitelistTransaction(
 }
 
 /**
+ * Create a transaction to remove an email from event whitelist
+ * @param eventId - Event object ID from blockchain
+ * @param email - Email address to remove from whitelist
+ * @returns Transaction object
+ */
+export function createRemoveFromWhitelistTransaction(
+  eventId: string,
+  email: string
+): Transaction {
+  const tx = new Transaction();
+  const emailHashBytes = hashEmailToBytes(email);
+
+  tx.moveCall({
+    target: FUNCTION_PATHS.EVENT_REMOVE_FROM_WHITELIST,
+    arguments: [
+      tx.object(eventId), // &mut Event
+      tx.pure.vector("u8", emailHashBytes), // vector<u8> email_hash
+    ],
+  });
+
+  return tx;
+}
+
+/**
+ * Create a transaction to close an event
+ * @param eventId - Event object ID from blockchain
+ * @returns Transaction object
+ */
+export function createCloseEventTransaction(eventId: string): Transaction {
+  const tx = new Transaction();
+
+  tx.moveCall({
+    target: FUNCTION_PATHS.EVENT_CLOSE,
+    arguments: [
+      tx.object(eventId), // &mut Event
+    ],
+  });
+
+  return tx;
+}
+
+/**
+ * Update event active status in Supabase
+ * @param eventId - Event ID from blockchain
+ * @param active - Active status
+ * @returns Success status
+ */
+export async function updateEventActiveStatus(
+  eventId: string,
+  active: boolean
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error } = await (supabase.from("events") as any)
+      .update({ active })
+      .eq("event_id", eventId);
+
+    if (error) {
+      console.error("Error updating event status:", error);
+      return {
+        success: false,
+        error: error.message || "Failed to update event status",
+      };
+    }
+
+    return { success: true };
+  } catch (error) {
+    console.error("Error updating event status:", error);
+    return {
+      success: false,
+      error:
+        error instanceof Error
+          ? error.message
+          : "Failed to update event status",
+    };
+  }
+}
+
+/**
+ * Close an event (on-chain and in database)
+ * @param eventId - Event object ID from blockchain
+ * @param suiClient - SuiClient instance
+ * @param signAndExecute - Function to sign and execute transaction
+ * @returns Success status and transaction digest
+ */
+export async function closeEvent(
+  eventId: string,
+  suiClient: SuiClient,
+  signAndExecute: (params: {
+    transaction: Transaction;
+  }) => Promise<{ digest: string }>
+): Promise<{ success: boolean; digest?: string; error?: string }> {
+  try {
+    // Create and execute transaction
+    const tx = createCloseEventTransaction(eventId);
+    const result = await signAndExecute({ transaction: tx });
+
+    // Wait for transaction
+    await suiClient.waitForTransaction({
+      digest: result.digest,
+    });
+
+    // Update status in Supabase
+    const updateResult = await updateEventActiveStatus(eventId, false);
+    if (!updateResult.success) {
+      console.error(
+        "Failed to update event status in database:",
+        updateResult.error
+      );
+      // Still return success since on-chain update succeeded
+    }
+
+    return { success: true, digest: result.digest };
+  } catch (error) {
+    console.error("Error closing event:", error);
+    const parsedError = popchainErrorDecoder.parseError(error);
+    return {
+      success: false,
+      error: parsedError.message,
+    };
+  }
+}
+
+/**
  * Whitelist a single email address for an event
  * @param eventId - Event object ID from blockchain
  * @param email - Email address to whitelist
@@ -272,9 +404,60 @@ export async function whitelistEmail(
     return { success: true, digest: result.digest };
   } catch (error) {
     console.error("Error whitelisting email:", error);
+    const parsedError = popchainErrorDecoder.parseError(error);
     return {
       success: false,
-      error: error instanceof Error ? error.message : "Unknown error",
+      error: parsedError.message,
+    };
+  }
+}
+
+/**
+ * Remove a single email address from event whitelist
+ * @param eventId - Event object ID from blockchain
+ * @param email - Email address to remove from whitelist
+ * @param suiClient - SuiClient instance
+ * @param signAndExecute - Function to sign and execute transaction
+ * @returns Success status and transaction digest
+ */
+export async function removeFromWhitelist(
+  eventId: string,
+  email: string,
+  suiClient: SuiClient,
+  signAndExecute: (params: {
+    transaction: Transaction;
+  }) => Promise<{ digest: string }>
+): Promise<{ success: boolean; digest?: string; error?: string }> {
+  try {
+    const tx = createRemoveFromWhitelistTransaction(eventId, email);
+    const result = await signAndExecute({ transaction: tx });
+
+    // Wait for transaction
+    await suiClient.waitForTransaction({
+      digest: result.digest,
+    });
+
+    // Delete from Supabase
+    const emailHash = hashEmail(email);
+    // Normalize hash: lowercase and trim to ensure consistent matching
+    const normalizedHash = emailHash.toLowerCase().trim();
+
+    const deleteResult = await deleteWhitelisting(eventId, normalizedHash);
+    if (!deleteResult.success) {
+      console.error(
+        "Error deleting whitelisting from database:",
+        deleteResult.error
+      );
+      // Still return success since on-chain removal succeeded
+    }
+
+    return { success: true, digest: result.digest };
+  } catch (error) {
+    console.error("Error removing email from whitelist:", error);
+    const parsedError = popchainErrorDecoder.parseError(error);
+    return {
+      success: false,
+      error: parsedError.message,
     };
   }
 }
@@ -304,16 +487,16 @@ export async function fetchEventById(eventId: string): Promise<Event | null> {
 }
 
 /**
- * Whitelisting with associated user name from user_profiles
+ * Whitelisting with associated user name from user_profiles (kept for backward compatibility)
  */
 export interface WhitelistingWithName extends Whitelisting {
-  name?: string; // First name + last name if matched in user_profiles
+  name?: string; // First name + last name if matched in user_profiles (not used anymore)
 }
 
 /**
- * Fetch whitelistings for an event and match them with user profile names
+ * Fetch whitelistings for an event
  * @param eventId - Event ID to fetch whitelistings for
- * @returns Array of whitelistings with optional name field
+ * @returns Array of whitelistings
  */
 export async function fetchWhitelistingsWithNames(
   eventId: string
@@ -331,84 +514,152 @@ export async function fetchWhitelistingsWithNames(
     return [];
   }
 
-  const typedWhitelistings = whitelistings as Whitelisting[];
+  return whitelistings as WhitelistingWithName[];
+}
 
-  // Get all unique email hashes from whitelistings (normalize to lowercase and trim)
-  const emailHashes = Array.from(
-    new Set(
-      typedWhitelistings
-        .map((w) => (w.email_hash || "").toLowerCase().trim())
-        .filter(Boolean)
-    )
-  );
+/**
+ * Delete a whitelisting from Supabase by event ID and email hash
+ * @param eventId - Event ID from blockchain
+ * @param emailHash - Email hash (normalized lowercase)
+ * @returns Success status
+ */
+export async function deleteWhitelisting(
+  eventId: string,
+  emailHash: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    // Normalize hash: lowercase and trim to ensure consistent matching
+    const normalizedHash = emailHash.toLowerCase().trim();
 
-  if (emailHashes.length === 0) {
-    return typedWhitelistings.map((w) => ({ ...w, name: undefined }));
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error } = await (supabase.from("whitelistings") as any)
+      .delete()
+      .eq("event_id", eventId)
+      .eq("email_hash", normalizedHash);
+
+    if (error) {
+      console.error("Error deleting whitelisting:", error);
+      return {
+        success: false,
+        error: error.message || "Failed to delete whitelisting",
+      };
+    }
+
+    return { success: true };
+  } catch (error) {
+    console.error("Error deleting whitelisting:", error);
+    return {
+      success: false,
+      error:
+        error instanceof Error
+          ? error.message
+          : "Failed to delete whitelisting",
+    };
   }
+}
 
-  // Fetch ALL user profiles and match in JavaScript for more reliable matching
-  // This avoids potential issues with Supabase's .in() query not finding matches
-  const { data: allProfiles, error: profilesError } =
-    await // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (supabase.from("user_profiles") as any).select(
-      "email_hash, first_name, last_name"
+/**
+ * Check if an email is whitelisted for an event on the blockchain
+ * @param eventId - Event object ID from blockchain
+ * @param emailHash - Email hash (hex string, normalized lowercase)
+ * @param suiClient - SuiClient instance
+ * @returns true if whitelisted, false otherwise
+ */
+export async function isEmailWhitelisted(
+  eventId: string,
+  emailHash: string,
+  suiClient: SuiClient
+): Promise<boolean> {
+  try {
+    // Normalize hash: lowercase and trim to ensure consistent matching
+    const normalizedHash = emailHash.toLowerCase().trim();
+
+    // Convert hex string to bytes array for the table key
+    // Email hash is stored as hex string, need to convert to bytes
+    const hashBytes = Uint8Array.from(
+      normalizedHash.match(/.{1,2}/g)?.map((byte) => parseInt(byte, 16)) || []
     );
 
-  if (profilesError) {
-    console.error("Error fetching profiles:", profilesError);
-  }
+    // Get the event object to access the whitelist table
+    const eventObject = await suiClient.getObject({
+      id: eventId,
+      options: {
+        showContent: true,
+        showType: true,
+      },
+    });
 
-  // Create a Set for fast lookup of whitelisting hashes
-  const emailHashSet = new Set(emailHashes);
+    if (
+      !eventObject.data ||
+      eventObject.error ||
+      !("content" in eventObject.data)
+    ) {
+      console.error("Event not found:", eventId);
+      return false;
+    }
 
-  // Create a map of email_hash -> name (normalized to lowercase)
-  // Match by normalizing both sides and only include profiles that match our whitelistings
-  const nameMap = new Map<string, string>();
+    const content = eventObject.data.content;
+    if (!content || !("fields" in content)) {
+      return false;
+    }
 
-  if (allProfiles && Array.isArray(allProfiles)) {
-    for (const profile of allProfiles as Array<{
-      email_hash: string;
-      first_name: string;
-      last_name: string;
-    }>) {
-      // Normalize hash: lowercase and trim
-      const normalizedHash = (profile.email_hash || "").toLowerCase().trim();
+    const fields = content.fields as Record<string, unknown>;
 
-      // Only add to map if this hash is in our whitelistings set (and not already added)
-      if (
-        normalizedHash &&
-        emailHashSet.has(normalizedHash) &&
-        !nameMap.has(normalizedHash)
+    // Get the whitelist table ID
+    let whitelistTableId: string | null = null;
+    if (fields.whitelist) {
+      if (typeof fields.whitelist === "string") {
+        whitelistTableId = fields.whitelist;
+      } else if (
+        typeof fields.whitelist === "object" &&
+        fields.whitelist !== null &&
+        "fields" in fields.whitelist
       ) {
-        const fullName = `${profile.first_name || ""} ${
-          profile.last_name || ""
-        }`.trim();
-
-        // Add to map even if name is empty - we'll show email or "Registered" as fallback
-        // This ensures we know the profile exists even without a name
-        if (fullName) {
-          nameMap.set(normalizedHash, fullName);
-        } else {
-          // Mark as registered even without name (use a special marker)
-          nameMap.set(normalizedHash, "Registered"); // Special marker for registered but no name
+        const whitelistObj = fields.whitelist as Record<string, unknown>;
+        if (whitelistObj.id) {
+          if (typeof whitelistObj.id === "string") {
+            whitelistTableId = whitelistObj.id;
+          } else if (
+            typeof whitelistObj.id === "object" &&
+            whitelistObj.id !== null &&
+            "id" in whitelistObj.id
+          ) {
+            const idObj = whitelistObj.id as Record<string, unknown>;
+            if (typeof idObj.id === "string") {
+              whitelistTableId = idObj.id;
+            }
+          }
         }
       }
     }
+
+    if (!whitelistTableId) {
+      console.error("Could not find whitelist table ID in event object");
+      return false;
+    }
+
+    // Try to get the dynamic field object for this email hash
+    // In Sui, table entries are stored as dynamic fields
+    // The key is the email hash bytes
+    try {
+      const dynamicField = await suiClient.getDynamicFieldObject({
+        parentId: whitelistTableId,
+        name: {
+          type: "vector<u8>",
+          value: Array.from(hashBytes),
+        },
+      });
+
+      // If the dynamic field exists, the email is whitelisted
+      return !!dynamicField.data && !dynamicField.error;
+    } catch {
+      // If getDynamicFieldObject throws or returns error, the key doesn't exist
+      return false;
+    }
+  } catch (error) {
+    console.error("Error checking whitelisting on blockchain:", error);
+    return false;
   }
-
-  // Combine whitelistings with names (normalize hash for lookup)
-  return typedWhitelistings.map((whitelisting) => {
-    // Normalize hash: lowercase and trim
-    const normalizedHash = (whitelisting.email_hash || "").toLowerCase().trim();
-    const matchedName = normalizedHash
-      ? nameMap.get(normalizedHash)
-      : undefined;
-
-    return {
-      ...whitelisting,
-      name: matchedName,
-    };
-  });
 }
 
 /**

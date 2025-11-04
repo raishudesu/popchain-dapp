@@ -17,6 +17,9 @@ import {
   QrCode,
   Copy,
   Check,
+  Plus,
+  X,
+  AlertTriangle,
 } from "lucide-react";
 import { toast } from "sonner";
 import type { Event } from "@/types/database";
@@ -24,6 +27,9 @@ import {
   fetchEventById,
   fetchWhitelistingsWithNames,
   whitelistCSVEmails,
+  whitelistEmail,
+  removeFromWhitelist,
+  closeEvent,
   type WhitelistingWithName,
   type WhitelistingProgress,
 } from "@/services/events";
@@ -49,6 +55,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
@@ -85,6 +101,11 @@ const EventDetailsPage = () => {
     useState<Certificate | null>(null);
   const [copiedLink, setCopiedLink] = useState(false);
   const [progress, setProgress] = useState<WhitelistingProgress | null>(null);
+  const [singleEmail, setSingleEmail] = useState("");
+  const [isAddingSingleEmail, setIsAddingSingleEmail] = useState(false);
+  const [showCloseEventDialog, setShowCloseEventDialog] = useState(false);
+  const [isClosingEvent, setIsClosingEvent] = useState(false);
+  const [removingEmail, setRemovingEmail] = useState<string | null>(null);
   const suiClient = useSuiClient();
   const { mutateAsync: signAndExecute } = useSignAndExecuteTransaction();
   const account = useCurrentAccount();
@@ -129,6 +150,107 @@ const EventDetailsPage = () => {
     queryFn: () => (eventId ? fetchCertificatesByEventId(eventId) : []),
     enabled: !!eventId,
   });
+
+  const handleAddSingleEmail = async () => {
+    if (!singleEmail.trim() || !eventId || !account) {
+      toast.error("Please enter a valid email and ensure wallet is connected");
+      return;
+    }
+
+    // Basic email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(singleEmail.trim())) {
+      toast.error("Please enter a valid email address");
+      return;
+    }
+
+    setIsAddingSingleEmail(true);
+    try {
+      const result = await whitelistEmail(
+        eventId,
+        singleEmail.trim(),
+        suiClient,
+        signAndExecute
+      );
+
+      if (result.success) {
+        toast.success(`Email ${singleEmail.trim()} whitelisted successfully!`);
+        setSingleEmail("");
+        refetch(); // Refresh event data
+        refetchWhitelistings(); // Refresh whitelistings table
+      } else {
+        toast.error(result.error || "Failed to whitelist email");
+      }
+    } catch (error) {
+      console.error("Error whitelisting email:", error);
+      const errorMessage =
+        error instanceof Error ? error.message : "Failed to whitelist email";
+      toast.error(errorMessage);
+    } finally {
+      setIsAddingSingleEmail(false);
+    }
+  };
+
+  const handleRemoveFromWhitelist = async (email: string) => {
+    if (!eventId || !account) {
+      toast.error("Please ensure wallet is connected");
+      return;
+    }
+
+    setRemovingEmail(email);
+    try {
+      const result = await removeFromWhitelist(
+        eventId,
+        email,
+        suiClient,
+        signAndExecute
+      );
+
+      if (result.success) {
+        toast.success(`Email ${email} removed from whitelist successfully!`);
+        refetch(); // Refresh event data
+        refetchWhitelistings(); // Refresh whitelistings table
+      } else {
+        toast.error(result.error || "Failed to remove email from whitelist");
+      }
+    } catch (error) {
+      console.error("Error removing email from whitelist:", error);
+      const errorMessage =
+        error instanceof Error
+          ? error.message
+          : "Failed to remove email from whitelist";
+      toast.error(errorMessage);
+    } finally {
+      setRemovingEmail(null);
+    }
+  };
+
+  const handleCloseEvent = async () => {
+    if (!eventId || !account) {
+      toast.error("Please ensure wallet is connected");
+      return;
+    }
+
+    setIsClosingEvent(true);
+    try {
+      const result = await closeEvent(eventId, suiClient, signAndExecute);
+
+      if (result.success) {
+        toast.success("Event closed successfully!");
+        setShowCloseEventDialog(false);
+        refetch(); // Refresh event data
+      } else {
+        toast.error(result.error || "Failed to close event");
+      }
+    } catch (error) {
+      console.error("Error closing event:", error);
+      const errorMessage =
+        error instanceof Error ? error.message : "Failed to close event";
+      toast.error(errorMessage);
+    } finally {
+      setIsClosingEvent(false);
+    }
+  };
 
   const handleFileUpload = async (
     event: React.ChangeEvent<HTMLInputElement>
@@ -264,11 +386,63 @@ const EventDetailsPage = () => {
   return (
     <div className="space-y-6 p-8">
       <BackButton />
-      <div>
-        <h1 className="text-3xl font-bold text-foreground mb-2">
-          {event.name}
-        </h1>
-        <p className="text-muted-foreground">{event.description}</p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold text-foreground mb-2">
+            {event.name}
+          </h1>
+          <p className="text-muted-foreground">{event.description}</p>
+        </div>
+        {event.active && (
+          <>
+            <Button
+              variant="destructive"
+              disabled={!account || isClosingEvent}
+              className="flex items-center gap-2"
+              onClick={() => setShowCloseEventDialog(true)}
+            >
+              <X className="w-4 h-4" />
+              Close Event
+            </Button>
+            <AlertDialog
+              open={showCloseEventDialog}
+              onOpenChange={setShowCloseEventDialog}
+            >
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle className="flex items-center gap-2">
+                    <AlertTriangle className="w-5 h-5 text-destructive" />
+                    Close Event
+                  </AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Are you sure you want to close this event? Once closed, no
+                    new certificates can be minted for this event. This action
+                    cannot be undone.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel disabled={isClosingEvent}>
+                    Cancel
+                  </AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={handleCloseEvent}
+                    disabled={isClosingEvent}
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  >
+                    {isClosingEvent ? (
+                      <>
+                        <Spinner className="w-4 h-4 mr-2" />
+                        Closing...
+                      </>
+                    ) : (
+                      "Close Event"
+                    )}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </>
+        )}
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Card>
@@ -276,39 +450,108 @@ const EventDetailsPage = () => {
             <CardTitle>Whitelist Attendees</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
+            {!event.active && (
+              <div className="p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
+                <p className="text-sm text-yellow-700 dark:text-yellow-400">
+                  This event is closed. You cannot add new whitelist entries.
+                </p>
+              </div>
+            )}
             <div className="space-y-2">
               <p className="text-sm text-muted-foreground">
-                Upload a CSV file with attendee emails. Each email will be
-                whitelisted on-chain and recorded in the database.
+                Add a single email or upload a CSV file with attendee emails.
+                Each email will be whitelisted on-chain and recorded in the
+                database.
               </p>
               <p className="text-xs text-muted-foreground">
                 CSV format: One email per line, or emails in the first column
               </p>
             </div>
 
-            <div className="flex items-center gap-4">
-              <Input
-                ref={fileInputRef}
-                type="file"
-                accept=".csv"
-                onChange={handleFileUpload}
-                disabled={isUploading || !account}
-                className="hidden"
-                id="csv-upload"
-              />
-              <Button
-                onClick={() => fileInputRef.current?.click()}
-                disabled={isUploading || !account}
-                className="btn-gradient"
-              >
-                <Upload className="w-4 h-4 mr-2" />
-                {isUploading ? "Processing..." : "Upload CSV"}
-              </Button>
-              {!account && (
-                <p className="text-sm text-muted-foreground">
-                  Please connect your wallet to whitelist emails
-                </p>
-              )}
+            {/* Single Email Input */}
+            <div className="space-y-2">
+              <Label htmlFor="single-email">Add Single Email</Label>
+              <div className="flex items-center gap-2">
+                <Input
+                  id="single-email"
+                  type="email"
+                  placeholder="attendee@example.com"
+                  value={singleEmail}
+                  onChange={(e) => setSingleEmail(e.target.value)}
+                  disabled={
+                    isAddingSingleEmail ||
+                    isUploading ||
+                    !account ||
+                    !event.active
+                  }
+                  onKeyDown={(e) => {
+                    if (
+                      e.key === "Enter" &&
+                      !isAddingSingleEmail &&
+                      event.active
+                    ) {
+                      handleAddSingleEmail();
+                    }
+                  }}
+                />
+                <Button
+                  onClick={handleAddSingleEmail}
+                  disabled={
+                    isAddingSingleEmail ||
+                    isUploading ||
+                    !account ||
+                    !singleEmail.trim() ||
+                    !event.active
+                  }
+                  className="btn-gradient"
+                  size="icon"
+                >
+                  {isAddingSingleEmail ? (
+                    <Spinner className="w-4 h-4" />
+                  ) : (
+                    <Plus className="w-4 h-4" />
+                  )}
+                </Button>
+              </div>
+            </div>
+
+            {/* CSV Upload */}
+            <div className="space-y-2">
+              <Label htmlFor="csv-upload">Bulk Upload (CSV)</Label>
+              <div className="flex items-center gap-4">
+                <Input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".csv"
+                  onChange={handleFileUpload}
+                  disabled={
+                    isUploading ||
+                    isAddingSingleEmail ||
+                    !account ||
+                    !event.active
+                  }
+                  className="hidden"
+                  id="csv-upload"
+                />
+                <Button
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={
+                    isUploading ||
+                    isAddingSingleEmail ||
+                    !account ||
+                    !event.active
+                  }
+                  className="btn-gradient"
+                >
+                  <Upload className="w-4 h-4 mr-2" />
+                  {isUploading ? "Processing..." : "Upload CSV"}
+                </Button>
+                {!account && (
+                  <p className="text-sm text-muted-foreground">
+                    Please connect your wallet to whitelist emails
+                  </p>
+                )}
+              </div>
             </div>
 
             {progress && progress.total > 0 && (
@@ -395,26 +638,40 @@ const EventDetailsPage = () => {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Name</TableHead>
                     <TableHead>Email</TableHead>
                     <TableHead>Whitelisted</TableHead>
+                    <TableHead className="w-[100px]">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {whitelistings.map((whitelisting) => (
                     <TableRow key={whitelisting.id}>
-                      <TableCell>
-                        {whitelisting.name || (
-                          <span className="text-muted-foreground">
-                            Not registered
-                          </span>
-                        )}
-                      </TableCell>
                       <TableCell className="font-mono text-sm">
                         {whitelisting.email}
                       </TableCell>
                       <TableCell>
                         {new Date(whitelisting.created_at).toLocaleDateString()}
+                      </TableCell>
+                      <TableCell>
+                        {event.active && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() =>
+                              handleRemoveFromWhitelist(whitelisting.email)
+                            }
+                            disabled={
+                              removingEmail === whitelisting.email || !account
+                            }
+                            className="h-8 w-8 p-0"
+                          >
+                            {removingEmail === whitelisting.email ? (
+                              <Spinner className="w-4 h-4" />
+                            ) : (
+                              <Trash2 className="w-4 h-4 text-destructive" />
+                            )}
+                          </Button>
+                        )}
                       </TableCell>
                     </TableRow>
                   ))}
@@ -431,7 +688,7 @@ const EventDetailsPage = () => {
             <CardTitle>Certificates</CardTitle>
             <Button
               onClick={() => setShowCreateCertificateDialog(true)}
-              disabled={!user || isCreatingCertificate}
+              disabled={!user || isCreatingCertificate || !event.active}
               className="btn-gradient"
             >
               <Upload className="w-4 h-4 mr-2" />
@@ -440,6 +697,13 @@ const EventDetailsPage = () => {
           </div>
         </CardHeader>
         <CardContent>
+          {!event.active && (
+            <div className="mb-4 p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
+              <p className="text-sm text-yellow-700 dark:text-yellow-400">
+                This event is closed. You cannot create new certificates.
+              </p>
+            </div>
+          )}
           {certificatesLoading ? (
             <div className="flex items-center justify-center py-8">
               <Spinner className="w-6 h-6" />
@@ -450,13 +714,13 @@ const EventDetailsPage = () => {
               started.
             </p>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4 items-center justify-center">
               {customCertificates.map((certificate) => (
                 <div
                   key={certificate.id}
                   className="relative border rounded-lg overflow-hidden bg-muted group"
                 >
-                  <div className="aspect-[9/16] relative">
+                  <div className="relative">
                     <img
                       src={certificate.image_url}
                       alt={certificate.name || "Certificate"}
@@ -703,6 +967,7 @@ const EventDetailsPage = () => {
                 showDownloadButton={true}
                 downloadFileName={`certificate-${selectedCertificateForQR.id}-qr-code`}
                 skipLogoOnDownload={false}
+                logoUrl={selectedCertificateForQR.tier_image_url || undefined}
               />
               <Button
                 variant="outline"

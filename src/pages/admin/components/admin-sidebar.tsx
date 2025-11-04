@@ -1,10 +1,7 @@
 import {
-  Calendar,
   ChevronUp,
-  Home,
-  Inbox,
+  LayoutDashboard,
   LogOut,
-  Search,
   Settings,
   User2,
 } from "lucide-react";
@@ -16,6 +13,7 @@ import {
   SidebarGroup,
   SidebarGroupContent,
   SidebarGroupLabel,
+  SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
@@ -33,34 +31,19 @@ import { useNavigate } from "react-router";
 // Menu items.
 const items = [
   {
-    title: "Home",
-    url: "#",
-    icon: Home,
-  },
-  {
-    title: "Inbox",
-    url: "#",
-    icon: Inbox,
-  },
-  {
-    title: "Calendar",
-    url: "#",
-    icon: Calendar,
-  },
-  {
-    title: "Search",
-    url: "#",
-    icon: Search,
+    title: "Dashboard",
+    url: "/admin/dashboard",
+    icon: LayoutDashboard,
   },
   {
     title: "Settings",
-    url: "#",
+    url: "/admin/settings",
     icon: Settings,
   },
 ];
 
 export function AdminSidebar() {
-  const { signOut } = useAuth();
+  const { signOut, user } = useAuth();
 
   const navigate = useNavigate();
 
@@ -76,8 +59,20 @@ export function AdminSidebar() {
   return (
     <Sidebar>
       <SidebarContent>
-        <SidebarGroup>
+        <SidebarHeader>
+          <div className="flex items-center gap-2">
+            <img
+              src={"/logos/popchain_logo.png"}
+              alt="popchain-logo"
+              className="w-12 h-12 object-contain"
+            />
+            <span className="font-bold text-lg text-gray-50 italic">
+              PopChain
+            </span>
+          </div>
           <SidebarGroupLabel>PopChain Admin</SidebarGroupLabel>
+        </SidebarHeader>
+        <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu>
               {items.map((item) => (
@@ -106,7 +101,7 @@ export function AdminSidebar() {
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <SidebarMenuButton>
-                  <User2 /> Username
+                  <User2 /> {user?.email}
                   <ChevronUp className="ml-auto" />
                 </SidebarMenuButton>
               </DropdownMenuTrigger>

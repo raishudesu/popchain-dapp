@@ -54,7 +54,7 @@ export default function App() {
 
         <Route path="/scan-qr/:certId" element={<ScanQrPage />} />
       </Routes>
-      <Toaster />
+      <Toaster position="top-right" richColors />
     </>
   );
 }

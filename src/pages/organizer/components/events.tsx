@@ -3,7 +3,13 @@ import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { PlusCircle, Users, Loader2, CheckCircle2 } from "lucide-react";
+import {
+  PlusCircle,
+  Users,
+  Loader2,
+  CheckCircle2,
+  XCircle,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { CreateEventDialog } from "./create-event-dialog";
 import { fetchOrganizerEvents } from "@/services/events";
@@ -74,7 +80,7 @@ export default function Events() {
           {eventsWithCount.map((event) => (
             <Card
               key={event.id}
-              className="hover:shadow-lg transition-shadow duration-300 cursor-pointer border-border hover:border-accent/50"
+              className="hover:shadow-lg transition-shadow duration-300 cursor-pointer border hover:border-primary/50 "
             >
               <CardHeader>
                 <div className="flex items-start justify-between gap-4">
@@ -83,13 +89,21 @@ export default function Events() {
                       {event.name}
                     </CardTitle>
                   </div>
-                  {event.active && (
+                  {event.active ? (
                     <Badge
                       variant="secondary"
                       className="bg-green-500/20 text-green-400 border-green-500/50"
                     >
                       <CheckCircle2 className="w-3 h-3 mr-1" />
                       Active
+                    </Badge>
+                  ) : (
+                    <Badge
+                      variant="secondary"
+                      className="bg-red-500/20 text-red-400 border-red-500/50"
+                    >
+                      <XCircle className="w-3 h-3 mr-1" />
+                      Closed
                     </Badge>
                   )}
                 </div>

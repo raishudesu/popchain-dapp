@@ -12,7 +12,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { toast } from "sonner";
 import type { Certificate } from "@/types/database";
 import type { Event } from "@/types/database";
-import { fetchEventById } from "@/services/events";
+import { getEventFromBlockchain } from "@/services/events";
 import {
   mintCertificateForAttendeeSponsored,
   getCertificateMintingData,
@@ -26,13 +26,15 @@ import {
 } from "@/lib/certificate-tiers";
 import { Badge } from "@/components/ui/badge";
 import { Gift } from "lucide-react";
-import { parseError } from "@/utils/errors";
+import { popchainErrorDecoder } from "@/utils/errors";
+import { useNavigate } from "react-router";
 
 interface ClaimCertificateDialogProps {
   certificateId: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onClaimed?: () => void;
+  onClaimFailedNotWhitelisted?: () => void;
   suiClient: SuiClient;
   certificate?: Certificate | null; // Optional pre-fetched certificate
 }
@@ -42,17 +44,18 @@ export function ClaimCertificateDialog({
   open,
   onOpenChange,
   onClaimed,
+  onClaimFailedNotWhitelisted,
   suiClient,
   certificate: certificateProp,
 }: ClaimCertificateDialogProps) {
   const [event, setEvent] = useState<Event | null>(null);
   const [isClaiming, setIsClaiming] = useState(false);
   const { profile } = useAuth();
-
+  const navigate = useNavigate();
   // Use certificate from prop (parent manages fetching)
   const certificate = certificateProp || null;
 
-  // Fetch event when certificate becomes available
+  // Fetch event from blockchain when certificate becomes available
   useEffect(() => {
     if (!open || !certificateId) {
       return;
@@ -63,23 +66,38 @@ export function ClaimCertificateDialog({
       return;
     }
 
-    // Fetch event data (optional - certificate can be displayed without event)
+    // Fetch event data from blockchain (event_id is a blockchain object ID)
     const loadEvent = async () => {
       try {
-        const eventDataFetched = await fetchEventById(certificate.event_id);
-        setEvent(eventDataFetched);
-        // Silently handle missing event - it might not exist in DB or be blocked by RLS
-        // The certificate can still be claimed without event details
+        const blockchainEvent = await getEventFromBlockchain(
+          certificate.event_id,
+          suiClient
+        );
+
+        if (blockchainEvent) {
+          // Convert blockchain event to database Event format for compatibility
+          setEvent({
+            event_id: certificate.event_id,
+            organizer_id: "", // Not available from blockchain
+            organizer_account_address: blockchainEvent.organizerAccount,
+            name: blockchainEvent.name,
+            description: blockchainEvent.description,
+            active: blockchainEvent.active,
+            created_at: new Date().toISOString(), // Not available from blockchain
+            updated_at: new Date().toISOString(), // Not available from blockchain
+          } as Event);
+        } else {
+          setEvent(null);
+        }
       } catch (error) {
-        console.error("Error loading event data:", error);
-        // Silently handle errors - 406 errors are often RLS-related
-        // The certificate can still be displayed and claimed
+        console.error("Error loading event data from blockchain:", error);
+        // Silently handle errors - certificate can still be claimed without event details
         setEvent(null);
       }
     };
 
     loadEvent();
-  }, [open, certificateId, certificate]);
+  }, [open, certificateId, certificate, suiClient]);
 
   const handleClaim = async () => {
     if (!certificate || !profile) {
@@ -88,14 +106,6 @@ export function ClaimCertificateDialog({
     }
 
     // Event is optional for claiming - we only need certificate and profile
-
-    // Check if user has PopChain account
-    if (!profile.popchain_account_address) {
-      toast.error(
-        "You need to create a PopChain account first. Please complete your registration."
-      );
-      return;
-    }
 
     // Wallet connection not needed - transaction is sponsored by organizer via service wallet
     setIsClaiming(true);
@@ -112,13 +122,20 @@ export function ClaimCertificateDialog({
         );
       }
 
+      // If user doesn't have a PopChain account, create one automatically
+      const attendeeAccountId = profile.popchain_account_address || "";
+      if (!attendeeAccountId) {
+        navigate("/login");
+      }
+
       // Use sponsored transaction - service wallet (treasury owner) signs and sponsors the transaction
       // The organizer's PopChainAccount will be charged the minting fee via charge_platform_fee
       // Attendee doesn't need wallet connected - transaction is fully sponsored by platform owner
       const result = await mintCertificateForAttendeeSponsored(
         certificate,
         mintingData.organizerAccountId,
-        profile.popchain_account_address,
+        attendeeAccountId,
+        profile.email,
         suiClient
       );
 
@@ -127,17 +144,20 @@ export function ClaimCertificateDialog({
         onClaimed?.();
         onOpenChange(false);
       } else {
-        // Error message is already parsed and user-friendly from parseError
-        toast.error(result.error || "Failed to claim certificate");
+        // Decode the error to get error code and message
+        const parsedError = popchainErrorDecoder.parseError(result.error);
+
+        toast.error(parsedError.message);
+        onClaimFailedNotWhitelisted?.();
       }
     } catch (error) {
       console.error("Error claiming certificate:", error);
 
-      // Parse error and get user-friendly message
+      // Use the reusable PopChain error decoder
+      const parsedError = popchainErrorDecoder.parseError(error);
 
-      const errorMessage = parseError(error);
-
-      toast.error(errorMessage);
+      toast.error(parsedError.message);
+      onClaimFailedNotWhitelisted?.();
     } finally {
       setIsClaiming(false);
     }
@@ -147,6 +167,11 @@ export function ClaimCertificateDialog({
   if (!certificate) {
     return (
       <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogTitle className="sr-only">Unclaimed Certificate</DialogTitle>
+        <DialogDescription className="sr-only">
+          You have an unclaimed certificate ready to mint! Claim it to receive
+          your NFT certificate on-chain.
+        </DialogDescription>
         <DialogContent>
           <div className="flex items-center justify-center py-8">
             <Spinner className="w-6 h-6" />
@@ -155,8 +180,6 @@ export function ClaimCertificateDialog({
       </Dialog>
     );
   }
-
-  // Show certificate even if event is not found - event name is optional
 
   const tier = getTierByName(certificate.tier_name as TierName);
 
@@ -177,7 +200,7 @@ export function ClaimCertificateDialog({
         <div className="space-y-4 py-4">
           {/* Certificate Preview */}
           <div className="flex flex-col items-center gap-4">
-            <div className="relative aspect-[9/16] w-32 border rounded-lg overflow-hidden bg-muted">
+            <div className="relative border rounded-lg overflow-hidden bg-muted">
               <img
                 src={certificate.image_url}
                 alt={certificate.name || "Certificate"}
@@ -190,7 +213,12 @@ export function ClaimCertificateDialog({
                 {certificate.name || "Certificate"}
               </p>
               {event && (
-                <p className="text-sm text-muted-foreground">{event.name}</p>
+                <>
+                  <p>Event: {event.name}</p>
+                  <p className="text-sm text-muted-foreground">
+                    {event.description}
+                  </p>
+                </>
               )}
               {tier && (
                 <Badge variant="outline" className={getTierBadgeColor(tier)}>
@@ -202,15 +230,6 @@ export function ClaimCertificateDialog({
               )}
             </div>
           </div>
-
-          {!profile?.popchain_account_address && (
-            <div className="p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
-              <p className="text-sm text-yellow-700 dark:text-yellow-400">
-                You need to create a PopChain account before claiming. Please
-                complete your registration.
-              </p>
-            </div>
-          )}
         </div>
 
         <DialogFooter>
@@ -223,7 +242,7 @@ export function ClaimCertificateDialog({
           </Button>
           <Button
             onClick={handleClaim}
-            disabled={isClaiming || !profile?.popchain_account_address}
+            disabled={isClaiming}
             className="btn-gradient"
           >
             {isClaiming ? (

@@ -2,9 +2,14 @@ import type { SuiClient } from "@mysten/sui/client";
 import { Transaction } from "@mysten/sui/transactions";
 import { FUNCTION_PATHS, PLATFORM_TREASURY_ADDRESS } from "@/lib/constants";
 import type { Certificate } from "@/types/database";
-import { fetchEventById, getEventFromBlockchain } from "./events";
+import {
+  fetchEventById,
+  getEventFromBlockchain,
+  deleteWhitelisting,
+} from "./events";
 import { getServiceWallet, getSuiClient } from "./sponsored-transaction";
-import { parseError } from "@/utils/errors";
+import { popchainErrorDecoder } from "@/utils/errors";
+import { hashEmail } from "@/utils/hash";
 
 /**
  * Extract the certificate object ID from transaction result
@@ -133,6 +138,7 @@ export function createMintCertificateTransaction(
  * @param certificate - Certificate data from database
  * @param organizerAccountId - Organizer's PopChainAccount object ID
  * @param attendeeAccountId - Attendee's PopChainAccount object ID
+ * @param attendeeEmail - Attendee's email address (for whitelisting deletion)
  * @param suiClient - SuiClient instance (optional, will use getSuiClient if not provided)
  * @returns Success status and transaction digest
  */
@@ -140,12 +146,13 @@ export async function mintCertificateForAttendeeSponsored(
   certificate: Certificate,
   organizerAccountId: string,
   attendeeAccountId: string,
+  attendeeEmail: string,
   suiClient?: SuiClient
 ): Promise<{
   success: boolean;
   digest?: string;
   certificateId?: string;
-  error?: string;
+  error?: unknown;
 }> {
   try {
     // Verify certificate has all required data
@@ -203,6 +210,23 @@ export async function mintCertificateForAttendeeSponsored(
     // Extract certificate ID from transaction result
     const certificateId = extractCertificateId(result);
 
+    // Delete whitelisting from Supabase after successful minting
+    // The smart contract removes the email_hash from the whitelist, so we sync it here
+    if (certificate.event_id && attendeeEmail) {
+      const emailHash = hashEmail(attendeeEmail);
+      const deleteResult = await deleteWhitelisting(
+        certificate.event_id,
+        emailHash
+      );
+      if (!deleteResult.success) {
+        console.error(
+          "Failed to delete whitelisting after minting:",
+          deleteResult.error
+        );
+        // Still return success since minting succeeded
+      }
+    }
+
     return {
       success: true,
       digest: result.digest,
@@ -211,12 +235,10 @@ export async function mintCertificateForAttendeeSponsored(
   } catch (error) {
     console.error("Error minting certificate:", error);
 
-    // Parse error and get user-friendly message
-    const errorMessage = parseError(error);
-
+    // Return the original error so the caller can decode it and extract error codes
     return {
       success: false,
-      error: errorMessage,
+      error: error,
     };
   }
 }
@@ -274,9 +296,10 @@ export async function mintCertificateForAttendee(
     return { success: true, digest: result.digest };
   } catch (error) {
     console.error("Error minting certificate:", error);
+    const parsedError = popchainErrorDecoder.parseError(error);
     return {
       success: false,
-      error: error instanceof Error ? error.message : "Unknown error",
+      error: parsedError.message,
     };
   }
 }
@@ -443,12 +466,12 @@ export async function transferCertificateToWallet(
   } catch (error) {
     console.error("Error transferring certificate to wallet:", error);
 
-    // Parse error and get user-friendly message
-    const errorMessage = parseError(error);
+    // Use the reusable PopChain error decoder
+    const parsedError = popchainErrorDecoder.parseError(error);
 
     return {
       success: false,
-      error: errorMessage,
+      error: parsedError.message,
     };
   }
 }
