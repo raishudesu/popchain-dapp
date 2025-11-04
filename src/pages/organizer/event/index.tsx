@@ -28,6 +28,7 @@ import {
   fetchWhitelistingsWithNames,
   whitelistCSVEmails,
   whitelistEmail,
+  removeFromWhitelist,
   closeEvent,
   type WhitelistingWithName,
   type WhitelistingProgress,
@@ -104,6 +105,7 @@ const EventDetailsPage = () => {
   const [isAddingSingleEmail, setIsAddingSingleEmail] = useState(false);
   const [showCloseEventDialog, setShowCloseEventDialog] = useState(false);
   const [isClosingEvent, setIsClosingEvent] = useState(false);
+  const [removingEmail, setRemovingEmail] = useState<string | null>(null);
   const suiClient = useSuiClient();
   const { mutateAsync: signAndExecute } = useSignAndExecuteTransaction();
   const account = useCurrentAccount();
@@ -186,6 +188,40 @@ const EventDetailsPage = () => {
       toast.error(errorMessage);
     } finally {
       setIsAddingSingleEmail(false);
+    }
+  };
+
+  const handleRemoveFromWhitelist = async (email: string) => {
+    if (!eventId || !account) {
+      toast.error("Please ensure wallet is connected");
+      return;
+    }
+
+    setRemovingEmail(email);
+    try {
+      const result = await removeFromWhitelist(
+        eventId,
+        email,
+        suiClient,
+        signAndExecute
+      );
+
+      if (result.success) {
+        toast.success(`Email ${email} removed from whitelist successfully!`);
+        refetch(); // Refresh event data
+        refetchWhitelistings(); // Refresh whitelistings table
+      } else {
+        toast.error(result.error || "Failed to remove email from whitelist");
+      }
+    } catch (error) {
+      console.error("Error removing email from whitelist:", error);
+      const errorMessage =
+        error instanceof Error
+          ? error.message
+          : "Failed to remove email from whitelist";
+      toast.error(errorMessage);
+    } finally {
+      setRemovingEmail(null);
     }
   };
 
@@ -604,6 +640,7 @@ const EventDetailsPage = () => {
                   <TableRow>
                     <TableHead>Email</TableHead>
                     <TableHead>Whitelisted</TableHead>
+                    <TableHead className="w-[100px]">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -614,6 +651,27 @@ const EventDetailsPage = () => {
                       </TableCell>
                       <TableCell>
                         {new Date(whitelisting.created_at).toLocaleDateString()}
+                      </TableCell>
+                      <TableCell>
+                        {event.active && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() =>
+                              handleRemoveFromWhitelist(whitelisting.email)
+                            }
+                            disabled={
+                              removingEmail === whitelisting.email || !account
+                            }
+                            className="h-8 w-8 p-0"
+                          >
+                            {removingEmail === whitelisting.email ? (
+                              <Spinner className="w-4 h-4" />
+                            ) : (
+                              <Trash2 className="w-4 h-4 text-destructive" />
+                            )}
+                          </Button>
+                        )}
                       </TableCell>
                     </TableRow>
                   ))}

@@ -225,6 +225,30 @@ export function createAddToWhitelistTransaction(
 }
 
 /**
+ * Create a transaction to remove an email from event whitelist
+ * @param eventId - Event object ID from blockchain
+ * @param email - Email address to remove from whitelist
+ * @returns Transaction object
+ */
+export function createRemoveFromWhitelistTransaction(
+  eventId: string,
+  email: string
+): Transaction {
+  const tx = new Transaction();
+  const emailHashBytes = hashEmailToBytes(email);
+
+  tx.moveCall({
+    target: FUNCTION_PATHS.EVENT_REMOVE_FROM_WHITELIST,
+    arguments: [
+      tx.object(eventId), // &mut Event
+      tx.pure.vector("u8", emailHashBytes), // vector<u8> email_hash
+    ],
+  });
+
+  return tx;
+}
+
+/**
  * Create a transaction to close an event
  * @param eventId - Event object ID from blockchain
  * @returns Transaction object
@@ -379,6 +403,52 @@ export async function whitelistEmail(
 }
 
 /**
+ * Remove a single email address from event whitelist
+ * @param eventId - Event object ID from blockchain
+ * @param email - Email address to remove from whitelist
+ * @param suiClient - SuiClient instance
+ * @param signAndExecute - Function to sign and execute transaction
+ * @returns Success status and transaction digest
+ */
+export async function removeFromWhitelist(
+  eventId: string,
+  email: string,
+  suiClient: SuiClient,
+  signAndExecute: (params: {
+    transaction: Transaction;
+  }) => Promise<{ digest: string }>
+): Promise<{ success: boolean; digest?: string; error?: string }> {
+  try {
+    const tx = createRemoveFromWhitelistTransaction(eventId, email);
+    const result = await signAndExecute({ transaction: tx });
+
+    // Wait for transaction
+    await suiClient.waitForTransaction({
+      digest: result.digest,
+    });
+
+    // Delete from Supabase
+    const emailHash = hashEmail(email);
+    // Normalize hash: lowercase and trim to ensure consistent matching
+    const normalizedHash = emailHash.toLowerCase().trim();
+    
+    const deleteResult = await deleteWhitelisting(eventId, normalizedHash);
+    if (!deleteResult.success) {
+      console.error("Error deleting whitelisting from database:", deleteResult.error);
+      // Still return success since on-chain removal succeeded
+    }
+
+    return { success: true, digest: result.digest };
+  } catch (error) {
+    console.error("Error removing email from whitelist:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Unknown error",
+    };
+  }
+}
+
+/**
  * Fetch an event by ID from Supabase
  * @param eventId - Event ID to fetch
  * @returns Event data or null if not found
@@ -431,6 +501,84 @@ export async function fetchWhitelistingsWithNames(
   }
 
   return whitelistings as WhitelistingWithName[];
+}
+
+/**
+ * Delete a whitelisting from Supabase by event ID and email hash
+ * @param eventId - Event ID from blockchain
+ * @param emailHash - Email hash (normalized lowercase)
+ * @returns Success status
+ */
+export async function deleteWhitelisting(
+  eventId: string,
+  emailHash: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    // Normalize hash: lowercase and trim to ensure consistent matching
+    const normalizedHash = emailHash.toLowerCase().trim();
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error } = await (supabase.from("whitelistings") as any)
+      .delete()
+      .eq("event_id", eventId)
+      .eq("email_hash", normalizedHash);
+
+    if (error) {
+      console.error("Error deleting whitelisting:", error);
+      return {
+        success: false,
+        error: error.message || "Failed to delete whitelisting",
+      };
+    }
+
+    return { success: true };
+  } catch (error) {
+    console.error("Error deleting whitelisting:", error);
+    return {
+      success: false,
+      error:
+        error instanceof Error
+          ? error.message
+          : "Failed to delete whitelisting",
+    };
+  }
+}
+
+/**
+ * Check if an email is whitelisted for an event
+ * @param eventId - Event ID from blockchain
+ * @param emailHash - Email hash (normalized lowercase)
+ * @returns true if whitelisted, false otherwise
+ */
+export async function isEmailWhitelisted(
+  eventId: string,
+  emailHash: string
+): Promise<boolean> {
+  try {
+    // Normalize hash: lowercase and trim to ensure consistent matching
+    const normalizedHash = emailHash.toLowerCase().trim();
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data, error } = await (supabase.from("whitelistings") as any)
+      .select("id")
+      .eq("event_id", eventId)
+      .eq("email_hash", normalizedHash)
+      .single();
+
+    if (error) {
+      if (error.code === "PGRST116") {
+        // Not found - return false
+        return false;
+      }
+      console.error("Error checking whitelisting:", error);
+      return false;
+    }
+
+    return !!data;
+  } catch (error) {
+    console.error("Error checking whitelisting:", error);
+    return false;
+  }
 }
 
 /**

@@ -12,7 +12,9 @@ import { Spinner } from "@/components/ui/spinner";
 import { toast } from "sonner";
 import type { Certificate } from "@/types/database";
 import type { Event } from "@/types/database";
-import { fetchEventById } from "@/services/events";
+import { fetchEventById, isEmailWhitelisted } from "@/services/events";
+import { hashEmail } from "@/utils/hash";
+import { clearUnclaimedCertificateId } from "@/utils/unclaimed-certificate";
 import {
   mintCertificateForAttendeeSponsored,
   getCertificateMintingData,
@@ -94,6 +96,26 @@ export function ClaimCertificateDialog({
     setIsClaiming(true);
 
     try {
+      // Check if user is still whitelisted before claiming
+      if (certificate.event_id && profile.email) {
+        const emailHash = hashEmail(profile.email);
+        const isWhitelisted = await isEmailWhitelisted(
+          certificate.event_id,
+          emailHash
+        );
+
+        if (!isWhitelisted) {
+          toast.error(
+            "You are no longer whitelisted for this event. Please contact the organizer."
+          );
+          // Clear unclaimed certificate from session
+          clearUnclaimedCertificateId();
+          onOpenChange(false);
+          setIsClaiming(false);
+          return;
+        }
+      }
+
       // Get minting data (try database first, fallback to blockchain)
       const mintingData = await getCertificateMintingData(
         certificate,
@@ -137,6 +159,7 @@ export function ClaimCertificateDialog({
         certificate,
         mintingData.organizerAccountId,
         attendeeAccountId,
+        profile.email,
         suiClient
       );
 
