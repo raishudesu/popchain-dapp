@@ -1,7 +1,7 @@
 import type { SuiClient } from "@mysten/sui/client";
 import { Transaction } from "@mysten/sui/transactions";
 import { FUNCTION_PATHS, PLATFORM_TREASURY_ADDRESS } from "@/lib/constants";
-import supabase from "@/utils/supabase";
+import supabase, { supabaseAdmin } from "@/utils/supabase";
 import type { Event, Whitelisting, WhitelistingInsert } from "@/types/database";
 import { hashEmail, hashEmailToBytes } from "@/utils/hash";
 import { popchainErrorDecoder } from "@/utils/errors";
@@ -526,18 +526,32 @@ export async function fetchWhitelistingsWithNames(
  * Delete a whitelisting from Supabase by event ID and email hash
  * @param eventId - Event ID from blockchain
  * @param emailHash - Email hash (normalized lowercase)
+ * @param bypassRLS - If true, use service role to bypass RLS (for system operations like certificate claiming)
  * @returns Success status
  */
 export async function deleteWhitelisting(
   eventId: string,
-  emailHash: string
+  emailHash: string,
+  bypassRLS: boolean = false
 ): Promise<{ success: boolean; error?: string }> {
   try {
     // Normalize hash: lowercase and trim to ensure consistent matching
     const normalizedHash = emailHash.toLowerCase().trim();
 
+    // Use service role client to bypass RLS if requested (for system operations)
+    // This is needed when attendees claim certificates - they don't have permission
+    // to delete whitelistings via RLS, but the system should remove them automatically
+    const client = bypassRLS && supabaseAdmin ? supabaseAdmin : supabase;
+
+    if (!client) {
+      return {
+        success: false,
+        error: "Supabase client not available",
+      };
+    }
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { error } = await (supabase.from("whitelistings") as any)
+    const { error } = await (client.from("whitelistings") as any)
       .delete()
       .eq("event_id", eventId)
       .eq("email_hash", normalizedHash);
