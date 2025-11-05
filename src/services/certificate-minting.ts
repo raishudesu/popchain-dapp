@@ -217,9 +217,11 @@ export async function mintCertificateForAttendeeSponsored(
       // Email case may differ between whitelisting and claiming
       const normalizedEmail = attendeeEmail.toLowerCase().trim();
       const emailHash = hashEmail(normalizedEmail);
+      const normalizedHash = emailHash.toLowerCase().trim();
+
       const deleteResult = await deleteWhitelisting(
         certificate.event_id,
-        emailHash
+        normalizedHash
       );
       if (!deleteResult.success) {
         console.error(
