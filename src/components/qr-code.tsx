@@ -59,16 +59,24 @@ const QRCodeComponent: React.FC<QRCodeComponentProps> = ({
   }, [value, size]);
 
   const handleDownload = async () => {
-    if (!canvasRef.current) return;
+    if (!canvasRef.current) {
+      setError("Canvas not available for download");
+      return;
+    }
 
     try {
       setIsDownloading(true);
+      setError(null);
 
       // Create a new canvas for download
       const downloadCanvas = document.createElement("canvas");
       const downloadCtx = downloadCanvas.getContext("2d");
 
-      if (!downloadCtx) return;
+      if (!downloadCtx) {
+        setError("Failed to create canvas context");
+        setIsDownloading(false);
+        return;
+      }
 
       // Set canvas size
       downloadCanvas.width = size;
@@ -88,6 +96,7 @@ const QRCodeComponent: React.FC<QRCodeComponentProps> = ({
       if (logoUrl && !skipLogoOnDownload) {
         try {
           const logoImg = document.createElement("img");
+          logoImg.crossOrigin = "anonymous";
 
           await new Promise<void>((resolve, reject) => {
             const timeout = setTimeout(() => {
@@ -129,61 +138,51 @@ const QRCodeComponent: React.FC<QRCodeComponentProps> = ({
               reject(new Error("Failed to load logo"));
             };
 
-            // Use local logo file (no CORS issues)
             logoImg.src = logoUrl;
           });
         } catch (err) {
-          console.warn("Failed to load logo, using text placeholder:", err);
-          try {
-            // Draw text-based logo placeholder
-            const logoX = (size - logoSize) / 2;
-            const logoY = (size - logoSize) / 2;
-
-            // Draw white background for logo
-            downloadCtx.fillStyle = "#FFFFFF";
-            downloadCtx.fillRect(
-              logoX - 8,
-              logoY - 8,
-              logoSize + 16,
-              logoSize + 16
-            );
-
-            // Draw text-based logo placeholder
-            downloadCtx.fillStyle = "#000000";
-            downloadCtx.font = "bold 16px Arial";
-            downloadCtx.textAlign = "center";
-            downloadCtx.textBaseline = "middle";
-            downloadCtx.fillText(
-              "HAY",
-              logoX + logoSize / 2,
-              logoY + logoSize / 2 - 8
-            );
-            downloadCtx.fillText(
-              "HAY",
-              logoX + logoSize / 2,
-              logoY + logoSize / 2 + 8
-            );
-          } catch (drawErr) {
-            console.warn("Text drawing failed:", drawErr);
-          }
+          console.warn("Failed to load logo for download:", err);
+          // Continue without logo - don't block the download
         }
       }
 
       // Convert canvas to blob and download
-      downloadCanvas.toBlob((blob) => {
-        if (blob) {
-          const url = URL.createObjectURL(blob);
-          const link = document.createElement("a");
-          link.href = url;
-          link.download = `${downloadFileName}.png`;
-          document.body.appendChild(link);
-          link.click();
-          document.body.removeChild(link);
-          URL.revokeObjectURL(url);
-        }
-      }, "image/png");
+      await new Promise<void>((resolve, reject) => {
+        downloadCanvas.toBlob(
+          (blob) => {
+            try {
+              if (!blob) {
+                reject(new Error("Failed to create blob from canvas"));
+                return;
+              }
+
+              const url = URL.createObjectURL(blob);
+              const link = document.createElement("a");
+              link.href = url;
+              link.download = `${downloadFileName}.png`;
+              link.style.display = "none";
+              document.body.appendChild(link);
+              link.click();
+              document.body.removeChild(link);
+
+              // Small delay to ensure download starts before revoking URL
+              setTimeout(() => {
+                URL.revokeObjectURL(url);
+                resolve();
+              }, 100);
+            } catch (err) {
+              reject(err);
+            }
+          },
+          "image/png",
+          1.0
+        );
+      });
     } catch (err) {
       console.error("Error downloading QR code:", err);
+      setError(
+        err instanceof Error ? err.message : "Failed to download QR code"
+      );
     } finally {
       setIsDownloading(false);
     }
@@ -235,12 +234,7 @@ const QRCodeComponent: React.FC<QRCodeComponentProps> = ({
       </div>
       {/* Download button */}
       {showDownloadButton && !isLoading && !error && (
-        <Button
-          onClick={handleDownload}
-          variant="outline"
-          size="sm"
-          className="btn-gradient"
-        >
+        <Button onClick={handleDownload} size="sm" className="btn-gradient">
           {isDownloading ? (
             <Loader2 className="w-4 h-4 animate-spin" />
           ) : (
