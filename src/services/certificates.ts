@@ -406,6 +406,10 @@ export async function getDefaultCertificateOptions(): Promise<
     "cert-2.png",
     "cert-3.png",
     "cert-4.png",
+    "cert-5.png",
+    "cert-6.png",
+    "cert-7.png",
+    "cert-8.png",
   ];
   const options: DefaultCertificateOption[] = [];
 

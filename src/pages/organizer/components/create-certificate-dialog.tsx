@@ -144,37 +144,86 @@ export function CreateCertificateDialog({
                     No default layouts available
                   </p>
                 ) : (
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                    {defaultCertificateOptions.map((option) => {
-                      const isSelected =
-                        selectedDefaultLayout?.index === option.index;
-                      return (
-                        <button
-                          key={option.index}
-                          type="button"
-                          onClick={() => onDefaultLayoutChange(option)}
-                          className={`relative aspect-[9/16] border-2 rounded-lg overflow-hidden transition-all ${
-                            isSelected
-                              ? "border-primary ring-2 ring-primary"
-                              : "border-muted hover:border-muted-foreground/50"
-                          }`}
-                        >
-                          <img
-                            src={option.url}
-                            alt={option.name}
-                            className="w-full h-full object-cover"
-                          />
-                          {isSelected && (
-                            <div className="absolute top-2 left-2 bg-primary text-primary-foreground px-2 py-1 rounded text-xs font-medium">
-                              Selected
-                            </div>
-                          )}
-                          <div className="absolute bottom-2 left-2 right-2 bg-background/90 px-2 py-1 rounded text-xs text-center">
-                            {option.name}
-                          </div>
-                        </button>
-                      );
-                    })}
+                  <div className="space-y-4">
+                    {/* Cert 1-4: 4 columns on md screens */}
+                    {defaultCertificateOptions.filter((opt) => opt.index <= 4)
+                      .length > 0 && (
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                        {defaultCertificateOptions
+                          .filter((opt) => opt.index <= 4)
+                          .map((option) => {
+                            const isSelected =
+                              selectedDefaultLayout?.index === option.index;
+
+                            return (
+                              <button
+                                key={option.index}
+                                type="button"
+                                onClick={() => onDefaultLayoutChange(option)}
+                                className={`relative border-2 rounded-lg overflow-hidden transition-all ${
+                                  isSelected
+                                    ? "border-primary ring-2 ring-primary"
+                                    : "border-muted hover:border-muted-foreground/50"
+                                }`}
+                              >
+                                <img
+                                  src={option.url}
+                                  alt={option.name}
+                                  className="w-full h-full object-cover"
+                                />
+                                {isSelected && (
+                                  <div className="absolute top-2 left-2 bg-primary text-primary-foreground px-2 py-1 rounded text-xs font-medium">
+                                    Selected
+                                  </div>
+                                )}
+                                <div className="absolute bottom-2 left-2 right-2 bg-background/90 px-2 py-1 rounded text-xs text-center">
+                                  {option.name}
+                                </div>
+                              </button>
+                            );
+                          })}
+                      </div>
+                    )}
+                    {/* Cert 5-8: 2 columns */}
+                    {defaultCertificateOptions.filter(
+                      (opt) => opt.index >= 5 && opt.index <= 8
+                    ).length > 0 && (
+                      <div className="grid grid-cols-2 gap-3">
+                        {defaultCertificateOptions
+                          .filter((opt) => opt.index >= 5 && opt.index <= 8)
+                          .map((option) => {
+                            const isSelected =
+                              selectedDefaultLayout?.index === option.index;
+
+                            return (
+                              <button
+                                key={option.index}
+                                type="button"
+                                onClick={() => onDefaultLayoutChange(option)}
+                                className={`relative border-2 rounded-lg overflow-hidden transition-all ${
+                                  isSelected
+                                    ? "border-primary ring-2 ring-primary"
+                                    : "border-muted hover:border-muted-foreground/50"
+                                }`}
+                              >
+                                <img
+                                  src={option.url}
+                                  alt={option.name}
+                                  className="w-full h-full object-cover"
+                                />
+                                {isSelected && (
+                                  <div className="absolute top-2 left-2 bg-primary text-primary-foreground px-2 py-1 rounded text-xs font-medium">
+                                    Selected
+                                  </div>
+                                )}
+                                <div className="absolute bottom-2 left-2 right-2 bg-background/90 px-2 py-1 rounded text-xs text-center">
+                                  {option.name}
+                                </div>
+                              </button>
+                            );
+                          })}
+                      </div>
+                    )}
                   </div>
                 )}
               </TabsContent>
