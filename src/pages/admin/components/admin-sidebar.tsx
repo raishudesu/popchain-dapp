@@ -69,9 +69,7 @@ export function AdminSidebar() {
               alt="popchain-logo"
               className="w-12 h-12 object-contain"
             />
-            <span className="font-bold text-lg text-gray-50 italic">
-              PopChain
-            </span>
+            <span className="font-bold text-lg italic">PopChain</span>
           </div>
           <SidebarGroupLabel>PopChain Admin</SidebarGroupLabel>
         </SidebarHeader>

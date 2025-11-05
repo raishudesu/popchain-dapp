@@ -15,6 +15,9 @@ import ScanQrPage from "./pages/scan-qr";
 import { Toaster } from "./components/ui/sonner";
 import { ProtectedRoute } from "./components/auth/protected-route";
 import { GuestRoute } from "./components/auth/guest-route";
+import OrganizerSettings from "./pages/organizer/settings";
+import AttendeeSettings from "./pages/attendee/settings";
+import AdminSettings from "./pages/admin/settings";
 
 export default function App() {
   return (
@@ -30,11 +33,13 @@ export default function App() {
         <Route element={<ProtectedRoute requiredRole="admin" />}>
           <Route element={<AdminLayout />}>
             <Route path="/admin/dashboard" element={<AdminDashboard />} />
+            <Route path="/admin/settings" element={<AdminSettings />} />
           </Route>
         </Route>
         <Route element={<ProtectedRoute requiredRole="attendee" />}>
           <Route element={<AttendeeLayout />}>
             <Route path="/attendee/dashboard" element={<AttendeeDashboard />} />
+            <Route path="/attendee/settings" element={<AttendeeSettings />} />
           </Route>
         </Route>
         <Route element={<ProtectedRoute requiredRole="organizer" />}>
@@ -47,6 +52,7 @@ export default function App() {
               path="/organizer/event/:eventId"
               element={<EventDetailsPage />}
             />
+            <Route path="/organizer/settings" element={<OrganizerSettings />} />
           </Route>
         </Route>
 
