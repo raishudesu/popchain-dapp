@@ -28,6 +28,7 @@ import {
 import { CustomConnectButton } from "@/components/custom-connect-button";
 import { useAuth } from "@/contexts/auth-context";
 import { ModeToggle } from "@/components/mode-toggle";
+import { useLocation } from "react-router";
 
 // Menu items.
 const items = [
@@ -45,6 +46,9 @@ const items = [
 
 export function AttendeeSidebar() {
   const { signOut, user, isAdmin } = useAuth();
+
+  const location = useLocation();
+  const isActive = (path: string) => location.pathname === path;
 
   return (
     <Sidebar>
@@ -65,7 +69,10 @@ export function AttendeeSidebar() {
             <SidebarMenu>
               {items.map((item) => (
                 <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild>
+                  <SidebarMenuButton
+                    asChild
+                    className={isActive(item.url) ? "bg-muted border-2" : ""}
+                  >
                     <a href={item.url}>
                       <item.icon />
                       <span>{item.title}</span>

@@ -28,7 +28,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { CustomConnectButton } from "@/components/custom-connect-button";
 import { useAuth } from "@/contexts/auth-context";
-import { useNavigate } from "react-router";
+import { useLocation, useNavigate } from "react-router";
 import { ModeToggle } from "@/components/mode-toggle";
 
 // Menu items.
@@ -59,6 +59,9 @@ export function AdminSidebar() {
     navigate("/login");
   };
 
+  const location = useLocation();
+  const isActive = (path: string) => location.pathname === path;
+
   return (
     <Sidebar>
       <SidebarContent>
@@ -78,7 +81,10 @@ export function AdminSidebar() {
             <SidebarMenu>
               {items.map((item) => (
                 <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild>
+                  <SidebarMenuButton
+                    asChild
+                    className={isActive(item.url) ? "bg-muted border-2" : ""}
+                  >
                     <a href={item.url}>
                       <item.icon />
                       <span>{item.title}</span>
@@ -105,7 +111,14 @@ export function AdminSidebar() {
                   </SidebarMenuItem>
                 )}
                 {isAttendee && (
-                  <SidebarMenuItem key="attendee-dashboard">
+                  <SidebarMenuItem
+                    key="attendee-dashboard"
+                    className={
+                      isActive("/attendee/dashboard")
+                        ? "bg-primary text-primary-foreground"
+                        : ""
+                    }
+                  >
                     <SidebarMenuButton asChild>
                       <a href="/attendee/dashboard">
                         <UserCheck />

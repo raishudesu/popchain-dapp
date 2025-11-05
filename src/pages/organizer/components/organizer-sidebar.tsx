@@ -27,7 +27,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { CustomConnectButton } from "@/components/custom-connect-button";
 import { useAuth } from "@/contexts/auth-context";
-import { useNavigate } from "react-router";
+import { useLocation, useNavigate } from "react-router";
 import { ModeToggle } from "@/components/mode-toggle";
 
 // Menu items.
@@ -58,6 +58,9 @@ export function OrganizerSidebar() {
     navigate("/login");
   };
 
+  const location = useLocation();
+  const isActive = (path: string) => location.pathname === path;
+
   return (
     <Sidebar>
       <SidebarContent>
@@ -78,7 +81,10 @@ export function OrganizerSidebar() {
             <SidebarMenu>
               {items.map((item) => (
                 <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild>
+                  <SidebarMenuButton
+                    asChild
+                    className={isActive(item.url) ? "bg-muted border-2" : ""}
+                  >
                     <a href={item.url}>
                       <item.icon />
                       <span>{item.title}</span>
