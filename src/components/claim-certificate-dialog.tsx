@@ -172,7 +172,7 @@ export function ClaimCertificateDialog({
           You have an unclaimed certificate ready to mint! Claim it to receive
           your NFT certificate on-chain.
         </DialogDescription>
-        <DialogContent>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <div className="flex items-center justify-center py-8">
             <Spinner className="w-6 h-6" />
           </div>
@@ -185,7 +185,7 @@ export function ClaimCertificateDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Gift className="w-5 h-5" />
