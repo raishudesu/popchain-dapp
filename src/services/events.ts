@@ -383,12 +383,15 @@ export async function whitelistEmail(
     });
 
     // Store in Supabase
-    const emailHash = hashEmail(email);
-    // Normalize hash: lowercase and trim to ensure consistent matching
+    // Normalize email before hashing to ensure consistent matching
+    // Email case may differ, so we normalize to lowercase and trim
+    const normalizedEmail = email.toLowerCase().trim();
+    const emailHash = hashEmail(normalizedEmail);
+    // Hash is already lowercase hex from sha3_256, but normalize for safety
     const normalizedHash = emailHash.toLowerCase().trim();
     const whitelistingData: WhitelistingInsert = {
       event_id: eventId,
-      email,
+      email: normalizedEmail, // Store normalized email for consistency
       email_hash: normalizedHash,
     };
 
@@ -438,8 +441,10 @@ export async function removeFromWhitelist(
     });
 
     // Delete from Supabase
-    const emailHash = hashEmail(email);
-    // Normalize hash: lowercase and trim to ensure consistent matching
+    // Normalize email before hashing to ensure consistent matching
+    const normalizedEmail = email.toLowerCase().trim();
+    const emailHash = hashEmail(normalizedEmail);
+    // Hash is already lowercase hex from sha3_256, but normalize for safety
     const normalizedHash = emailHash.toLowerCase().trim();
 
     const deleteResult = await deleteWhitelisting(eventId, normalizedHash);
