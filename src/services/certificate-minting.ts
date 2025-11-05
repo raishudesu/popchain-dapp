@@ -212,6 +212,8 @@ export async function mintCertificateForAttendeeSponsored(
 
     // Delete whitelisting from Supabase after successful minting
     // The smart contract removes the email_hash from the whitelist, so we sync it here
+    // Use bypassRLS=true because attendees don't have permission to delete whitelistings
+    // via RLS, but this is a system operation that should happen automatically
     if (certificate.event_id && attendeeEmail) {
       // Normalize email before hashing to ensure consistent matching
       // Email case may differ between whitelisting and claiming
@@ -221,7 +223,8 @@ export async function mintCertificateForAttendeeSponsored(
 
       const deleteResult = await deleteWhitelisting(
         certificate.event_id,
-        normalizedHash
+        normalizedHash,
+        true // bypassRLS - this is a system operation after successful certificate claim
       );
       if (!deleteResult.success) {
         console.error(
