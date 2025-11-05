@@ -6,7 +6,7 @@ export default function AttendeeLayout() {
   return (
     <SidebarProvider>
       <AttendeeSidebar />
-      <main>
+      <main className="w-full">
         <SidebarTrigger />
         <Outlet />
       </main>
