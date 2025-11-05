@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   Dialog,
@@ -11,7 +11,14 @@ import {
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { Badge } from "@/components/ui/badge";
-import { Info, Award, Calendar, User, ExternalLink } from "lucide-react";
+import {
+  Info,
+  Award,
+  Calendar,
+  User,
+  ExternalLink,
+  ImageOff,
+} from "lucide-react";
 import { getEventFromBlockchain } from "@/services/events";
 import type { SuiClient } from "@mysten/sui/client";
 import { getTierBadgeColor, getTierByName } from "@/lib/certificate-tiers";
@@ -39,6 +46,14 @@ export function CertificateDetailsDialog({
   suiClient,
 }: CertificateDetailsDialogProps) {
   const [open, setOpen] = useState(false);
+  const [imageError, setImageError] = useState(false);
+
+  // Reset image error state when dialog opens
+  useEffect(() => {
+    if (open) {
+      setImageError(false);
+    }
+  }, [open]);
 
   // Fetch event details when dialog opens
   const {
@@ -75,14 +90,27 @@ export function CertificateDetailsDialog({
           {certificate.imageUrl && (
             <div className="relative border rounded-lg overflow-hidden bg-muted">
               <div className="relative bg-gradient-to-br from-purple-500/20 to-blue-500/20">
-                <img
-                  src={certificate.imageUrl}
-                  alt={`${certificate.tier.name} Certificate`}
-                  className="w-full h-auto object-contain"
-                  onError={(e) => {
-                    e.currentTarget.style.display = "none";
-                  }}
-                />
+                {imageError ? (
+                  <div className="flex flex-col items-center justify-center py-16 px-4 text-center">
+                    <ImageOff className="w-16 h-16 text-muted-foreground mb-4 opacity-50" />
+                    <p className="text-sm font-medium text-foreground mb-1">
+                      Certificate Image Not Available
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {certificate.tier.name} -{" "}
+                      {certificate.tier.level || "Certificate"}
+                    </p>
+                  </div>
+                ) : (
+                  <img
+                    src={certificate.imageUrl}
+                    alt={`${certificate.tier.name} Certificate`}
+                    className="w-full h-auto object-contain"
+                    onError={() => {
+                      setImageError(true);
+                    }}
+                  />
+                )}
               </div>
             </div>
           )}

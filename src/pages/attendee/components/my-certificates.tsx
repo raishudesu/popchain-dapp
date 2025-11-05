@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { ImageOff } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   useSuiClient,
@@ -37,6 +38,7 @@ export function MyCertificates() {
   const [transferringCertId, setTransferringCertId] = useState<string | null>(
     null
   );
+  const [imageErrors, setImageErrors] = useState<Set<string>>(new Set());
 
   // Fetch certificates from blockchain
   const {
@@ -279,16 +281,32 @@ export function MyCertificates() {
                 <div className="relative bg-gradient-to-br from-purple-500/20 to-blue-500/20 overflow-hidden">
                   {/* Certificate image - aspect ratio determined by image */}
                   {certificate.imageUrl ? (
-                    <img
-                      src={certificate.imageUrl}
-                      alt={`${certificate.tier.name} Certificate`}
-                      className="w-full h-auto object-contain"
-                      onError={(e) => {
-                        e.currentTarget.style.display = "none";
-                      }}
-                    />
+                    imageErrors.has(certificate.objectId) ? (
+                      <div className="w-full aspect-[16/9] flex flex-col items-center justify-center py-8 px-4 text-center">
+                        <ImageOff className="w-12 h-12 text-muted-foreground mb-3 opacity-50" />
+                        <p className="text-xs font-medium text-foreground mb-1">
+                          Image Not Available
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {certificate.tier.name}
+                        </p>
+                      </div>
+                    ) : (
+                      <img
+                        src={certificate.imageUrl}
+                        alt={`${certificate.tier.name} Certificate`}
+                        className="w-full h-auto object-contain"
+                        onError={() => {
+                          setImageErrors((prev) => {
+                            const newSet = new Set(prev);
+                            newSet.add(certificate.objectId);
+                            return newSet;
+                          });
+                        }}
+                      />
+                    )
                   ) : (
-                    <div className="w-full aspect-[9/16] flex items-center justify-center">
+                    <div className="w-full aspect-[16/9] flex items-center justify-center">
                       <Award className="w-16 h-16 text-muted-foreground/50" />
                     </div>
                   )}
