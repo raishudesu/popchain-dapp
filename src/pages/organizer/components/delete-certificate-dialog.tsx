@@ -18,12 +18,14 @@ interface DeleteCertificateDialogProps {
   certificate: Certificate;
   onConfirm: (certificateId: string, imageUrl: string) => void;
   isDeleting: boolean;
+  disabled?: boolean;
 }
 
 export function DeleteCertificateDialog({
   certificate,
   onConfirm,
   isDeleting,
+  disabled = false,
 }: DeleteCertificateDialogProps) {
   const [open, setOpen] = useState(false);
 
@@ -32,13 +34,21 @@ export function DeleteCertificateDialog({
     setOpen(false);
   };
 
+  const handleOpen = () => {
+    if (disabled) {
+      return;
+    }
+    setOpen(true);
+  };
+
   return (
     <>
       <Button
         variant="destructive"
         size="sm"
-        onClick={() => setOpen(true)}
-        disabled={isDeleting}
+        onClick={handleOpen}
+        disabled={isDeleting || disabled}
+        title={disabled ? "Cannot delete certificate: Event has ended" : undefined}
       >
         <Trash2 className="w-4 h-4" />
       </Button>

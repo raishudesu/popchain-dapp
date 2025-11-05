@@ -25,6 +25,7 @@ import { linkWalletToAccount } from "@/services/wallet";
 import { transferCertificateToWallet } from "@/services/certificate-minting";
 import { popchainErrorDecoder } from "@/utils/errors";
 import supabase from "@/utils/supabase";
+import { CertificateDetailsDialog } from "./certificate-details-dialog";
 
 export function MyCertificates() {
   const { profile, loading: authLoading } = useAuth();
@@ -320,6 +321,14 @@ export function MyCertificates() {
                   <p className="text-xs text-muted-foreground mt-2 truncate font-mono">
                     ID: {certificate.objectId.slice(0, 8)}...
                   </p>
+
+                  {/* View Details Button */}
+                  <div className="mt-3">
+                    <CertificateDetailsDialog
+                      certificate={certificate}
+                      suiClient={suiClient}
+                    />
+                  </div>
 
                   {/* Transfer Certificate Button / Status */}
                   {!profile?.wallet_address ? (

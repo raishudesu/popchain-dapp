@@ -328,19 +328,24 @@ const EventDetailsPage = () => {
     }
   };
 
-  const handleDeleteCertificate = (certificateId: string, imageUrl: string) => {
-    deleteCertificateMutation.mutate({ certificateId, imageUrl });
+  const handleDeleteCertificate = (
+    certificateId: string,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    _imageUrl: string
+  ) => {
+    // Prevent deletion if event has ended
+    if (!event?.active) {
+      toast.error("Cannot delete certificate: Event has ended");
+      return;
+    }
+
+    deleteCertificateMutation.mutate({ certificateId });
   };
 
   // Delete certificate mutation
   const deleteCertificateMutation = useMutation({
-    mutationFn: ({
-      certificateId,
-      imageUrl,
-    }: {
-      certificateId: string;
-      imageUrl: string;
-    }) => deleteCertificate(certificateId, imageUrl),
+    mutationFn: ({ certificateId }: { certificateId: string }) =>
+      deleteCertificate(certificateId),
     onSuccess: () => {
       toast.success("Certificate deleted successfully");
       refetchCertificates();
@@ -690,6 +695,7 @@ const EventDetailsPage = () => {
                         certificate={certificate}
                         onConfirm={handleDeleteCertificate}
                         isDeleting={deleteCertificateMutation.isPending}
+                        disabled={!event?.active}
                       />
                     </div>
                   </div>

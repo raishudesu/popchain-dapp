@@ -666,39 +666,11 @@ export async function uploadAndCreateCertificate(
  * @param imageUrl - URL of the image to delete from storage
  * @returns Promise<void>
  */
-export async function deleteCertificate(
-  certificateId: string,
-  imageUrl: string
-): Promise<void> {
+export async function deleteCertificate(certificateId: string): Promise<void> {
   if (!supabaseAdmin) {
     throw new Error(
       "Service role key not configured. Please set VITE_SERVICE_ROLE_KEY"
     );
-  }
-
-  // Extract file path from URL
-  // URL format: https://<project>.supabase.co/storage/v1/object/public/certificates/custom/filename
-  const urlParts = imageUrl.split("/certificates/");
-  if (urlParts.length < 2) {
-    throw new Error("Invalid certificate URL");
-  }
-
-  const filePath = urlParts[1];
-
-  // Skip deletion if image is from defaults folder
-  if (filePath.startsWith("defaults/")) {
-    console.log("Skipping deletion of default certificate image:", filePath);
-  } else {
-    // Delete from storage using admin client
-    const bucketName = "certificates";
-    const { error: storageError } = await supabaseAdmin.storage
-      .from(bucketName)
-      .remove([filePath]);
-
-    if (storageError) {
-      console.error("Error deleting certificate from storage:", storageError);
-      // Continue to delete from database even if storage delete fails
-    }
   }
 
   // Delete from database using admin client to bypass RLS
