@@ -8,22 +8,11 @@ import {
 } from "@/lib/certificate-tiers";
 import type { SuiClient } from "@mysten/sui/client";
 import { CONTRACT_PACKAGE_ID } from "@/lib/constants";
-import { getFilePublicUrl, uploadImageToTusky, deleteImageFromTusky } from "./tusky";
-
-/**
- * Extracts the blobId from a Tusky URL.
- * @param url The Tusky URL.
- * @returns The blobId.
- */
-const extractBlobIdFromUrl = (url: string) => {
-    try {
-        const urlObject = new URL(url);
-        return urlObject.pathname.substring(1); // Remove the leading '/'
-    } catch (error) {
-        console.error("Invalid URL provided to extractBlobIdFromUrl");
-        return null;
-    }
-}
+import {
+  getFilePublicUrl,
+  uploadImageToTusky,
+  getImagePublicUrlByUploadId,
+} from "./tusky";
 
 /**
  * Certificate object structure from blockchain
@@ -170,7 +159,7 @@ export async function getCertificateFromBlockchain(
           name: tierName,
           level: tierDefinition.level,
           description: tierDefinition.description,
-          imageUrl: tierUrl || getTierImageUrl(tierDefinition),
+          imageUrl: tierUrl || getTierImageUrl(tierDefinition)!,
         };
       } else {
         // Fallback if tier definition not found
@@ -424,7 +413,7 @@ export function getDefaultCertificateOptions(): DefaultCertificateOption[] {
   return defaultCertificateBlobIds.map((blobId, index) => ({
     index: index + 1,
     name: `cert-${index + 1}.png`,
-    url: getFilePublicUrl(blobId),
+    url: getFilePublicUrl(blobId)!, // Non-null assertion: blobId string always returns string URL
   }));
 }
 
@@ -438,7 +427,7 @@ export function getTierImageUrlByName(tierName: TierName): string {
   if (!tier) {
     throw new Error(`Invalid tier name: ${tierName}`);
   }
-  return getTierImageUrl(tier);
+  return getTierImageUrl(tier)!;
 }
 
 /**
@@ -446,9 +435,7 @@ export function getTierImageUrlByName(tierName: TierName): string {
  * @param file - Image file to upload (suggested sizes: 1920x1080 or 1080x1920)
  * @returns Promise with public URL of uploaded image.
  */
-export async function uploadCertificateImage(
-  file: File
-): Promise<string> {
+export async function uploadCertificateImage(file: File): Promise<string> {
   // Validate file is an image
   if (!file.type.startsWith("image/")) {
     throw new Error("File must be an image");
@@ -535,6 +522,37 @@ export async function fetchCertificatesByEventId(
 }
 
 /**
+ * Update a certificate's image_url
+ * @param certificateId - Certificate ID to update
+ * @param imageUrl - New image URL
+ * @returns Promise with updated certificate
+ */
+export async function updateCertificateImageUrl(
+  certificateId: string,
+  imageUrl: string
+): Promise<Certificate> {
+  if (!supabaseAdmin) {
+    throw new Error(
+      "Service role key not configured. Please set VITE_SERVICE_ROLE_KEY"
+    );
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (supabaseAdmin.from("certificates") as any)
+    .update({ image_url: imageUrl })
+    .eq("id", certificateId)
+    .select()
+    .single();
+
+  if (error) {
+    console.error("Error updating certificate image URL:", error);
+    throw new Error(`Failed to update certificate: ${error.message}`);
+  }
+
+  return data as Certificate;
+}
+
+/**
  * Create certificate from default layout
  * @param defaultLayoutUrl - URL of the default certificate layout
  * @param defaultLayoutIndex - Index of the default layout (1-8)
@@ -597,17 +615,23 @@ export async function uploadAndCreateCertificate(
     throw new Error(`Invalid tier name: ${tierName}`);
   }
 
-  // Upload image to Tusky
-  const imageUrl = await uploadCertificateImage(file);
+  // Upload image to Tusky and get uploadId
+  const uploadId = await uploadCertificateImage(file);
 
   const tierImageUrl = getTierImageUrl(tier);
   const tierIndex = getTierIndex(tierName);
 
+  // Try to get the public URL immediately (may be null if metadata not available)
+  const imageUrl = await getImagePublicUrlByUploadId(uploadId);
+
   // Create database record
+  // Store uploadId in tusky_upload_id field
+  // Store imageUrl if available, otherwise use empty string (will be fetched when displaying)
   const certificateData: CertificateInsert = {
     event_id: eventId,
     user_id: userId,
-    image_url: imageUrl,
+    image_url: imageUrl || "", // Empty if metadata not available yet
+    tusky_upload_id: uploadId, // Store uploadId for later metadata retrieval
     name: name || null,
     is_default: false,
     tier_name: tier.name,
@@ -635,7 +659,9 @@ export async function deleteCertificate(certificateId: string): Promise<void> {
   // First, fetch the certificate to get the image URL
   const certificate = await fetchCertificateById(certificateId);
   if (!certificate) {
-    console.warn(`Certificate with ID ${certificateId} not found. Cannot delete.`);
+    console.warn(
+      `Certificate with ID ${certificateId} not found. Cannot delete.`
+    );
     return;
   }
 
@@ -647,19 +673,8 @@ export async function deleteCertificate(certificateId: string): Promise<void> {
 
   if (dbError) {
     console.error("Error deleting certificate from database:", dbError);
-    throw new Error(`Failed to delete certificate from database: ${dbError.message}`);
-  }
-
-  // If the image is not a default image, delete it from Tusky
-  if (!certificate.is_default) {
-    const blobId = extractBlobIdFromUrl(certificate.image_url);
-    if (blobId) {
-      try {
-        await deleteImageFromTusky(blobId);
-      } catch (tuskyError) {
-        console.error(`Failed to delete image from Tusky: ${tuskyError}`);
-        // Optional: Decide if you want to re-throw or handle this case
-      }
-    }
+    throw new Error(
+      `Failed to delete certificate from database: ${dbError.message}`
+    );
   }
 }

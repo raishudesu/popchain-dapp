@@ -137,6 +137,7 @@ export interface Certificate {
   event_id: string; // Event object ID from blockchain
   user_id: string; // UUID from auth.users
   image_url: string; // URL to the certificate image in Supabase storage
+  tusky_upload_id: string | null; // Tusky upload ID for retrieving blobId asynchronously
   name: string | null; // Optional name for the certificate
   is_default: boolean; // Whether this is a default certificate
   tier_name: string; // Tier name: PopPass, PopBadge, PopMedal, PopTrophy
@@ -152,6 +153,7 @@ export interface CertificateInsert {
   event_id: string;
   user_id: string;
   image_url: string;
+  tusky_upload_id?: string | null;
   name?: string | null;
   is_default?: boolean;
   tier_name: string;
@@ -165,6 +167,7 @@ export interface CertificateUpdate {
   event_id?: string;
   user_id?: string;
   image_url?: string;
+  tusky_upload_id?: string | null;
   name?: string | null;
   is_default?: boolean;
   tier_name?: string;

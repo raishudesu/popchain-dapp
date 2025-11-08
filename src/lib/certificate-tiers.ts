@@ -35,7 +35,7 @@ export const CERTIFICATE_TIERS: CertificateTier[] = [
     level: "Premium",
     description: "Distinction / Speaker",
     imageFileName: "pop_medal.png",
-    blobId:"9Zg9oNmYzrIL9IfWkNGN8RiK6MVTAnoFYE7W1rLOaI0",
+    blobId: "9Zg9oNmYzrIL9IfWkNGN8RiK6MVTAnoFYE7W1rLOaI0",
     color: "red",
   },
   {
@@ -66,8 +66,8 @@ export function getTierIndex(tierName: TierName): number {
 /**
  * Get tier image URL from Tusky
  */
-export function getTierImageUrl(tier: CertificateTier): string {
-  return getFilePublicUrl(tier.blobId);
+export function getTierImageUrl(tier: CertificateTier): string | null {
+  return getFilePublicUrl(tier.blobId)!;
 }
 
 /**
@@ -75,11 +75,11 @@ export function getTierImageUrl(tier: CertificateTier): string {
  */
 export function getAllTierImageUrls(): Record<TierName, string> {
   const urls: Partial<Record<TierName, string>> = {};
-  
+
   for (const tier of CERTIFICATE_TIERS) {
-    urls[tier.name] = getFilePublicUrl(tier.blobId);
+    urls[tier.name] = getFilePublicUrl(tier.blobId)!;
   }
-  
+
   return urls as Record<TierName, string>;
 }
 
