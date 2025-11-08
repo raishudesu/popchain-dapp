@@ -222,7 +222,10 @@ export function ClaimCertificateDialog({
                 </>
               )}
               {tier && (
-                <Badge variant="outline" className={getTierBadgeColor(tier)}>
+                <Badge
+                  variant="outline"
+                  className={getTierBadgeColor(tier.name)}
+                >
                   <span className="font-semibold">{certificate.tier_name}</span>
                   <span className="text-xs opacity-80 ml-1">
                     {certificate.tier_level}
