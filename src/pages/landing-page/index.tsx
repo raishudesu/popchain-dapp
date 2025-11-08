@@ -4,6 +4,7 @@ import Benefits from "@/pages/landing-page/benefits";
 import Cta from "@/pages/landing-page/cta";
 import Hero from "./hero";
 import Features from "./features";
+import Ranking from "./ranking";
 
 const LandingPage = () => {
   return (
@@ -12,6 +13,7 @@ const LandingPage = () => {
       <Features />
       <Tiers />
       <HowItWorks />
+      <Ranking />
       <Benefits />
       <Cta />
     </>
