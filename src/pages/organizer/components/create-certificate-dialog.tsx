@@ -17,12 +17,30 @@ import { Spinner } from "@/components/ui/spinner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   CERTIFICATE_TIERS,
-  getTierImageUrl,
   getTierBadgeColor,
   type TierName,
 } from "@/lib/certificate-tiers";
 import type { DefaultCertificateOption } from "@/services/certificates";
+import { getTierImageUrlByName } from "@/services/certificates";
 import { Upload } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
+
+// A component to handle image loading state
+const ImageWithLoader = ({ src, alt, className }: { src: string; alt: string; className: string }) => {
+  const [isLoading, setIsLoading] = useState(true);
+
+  return (
+    <div className="w-full h-full relative">
+      {isLoading && <Skeleton className={className} />}
+      <img
+        src={src}
+        alt={alt}
+        className={`${className} ${isLoading ? "hidden" : "block"}`}
+        onLoad={() => setIsLoading(false)}
+      />
+    </div>
+  );
+};
 
 interface CreateCertificateDialogProps {
   selectedTier: TierName;
@@ -92,7 +110,6 @@ export function CreateCertificateDialog({
             <Label className="text-base font-semibold">Select Tier</Label>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               {CERTIFICATE_TIERS.map((tier) => {
-                const tierImageUrl = getTierImageUrl(tier);
                 const isSelected = selectedTier === tier.name;
                 return (
                   <button
@@ -105,15 +122,17 @@ export function CreateCertificateDialog({
                         : "border-muted hover:border-muted-foreground/50"
                     }`}
                   >
-                    <img
-                      src={tierImageUrl}
-                      alt={tier.name}
-                      className="w-12 h-12 object-contain"
-                    />
+                    <div className="w-12 h-12">
+                      <ImageWithLoader
+                        src={getTierImageUrlByName(tier.name)}
+                        alt={tier.name}
+                        className="w-full h-full object-contain"
+                      />
+                    </div>
                     <span className="font-semibold">{tier.name}</span>
                     <Badge
                       variant="outline"
-                      className={getTierBadgeColor(tier)}
+                      className={getTierBadgeColor(tier.name)}
                     >
                       <span className="text-xs opacity-80 ml-1">
                         {tier.level}
@@ -160,13 +179,13 @@ export function CreateCertificateDialog({
                                 key={option.index}
                                 type="button"
                                 onClick={() => onDefaultLayoutChange(option)}
-                                className={`relative border-2 rounded-lg overflow-hidden transition-all ${
+                                className={`relative border-2 rounded-lg overflow-hidden transition-all aspect-[9/16] ${
                                   isSelected
                                     ? "border-primary ring-2 ring-primary"
                                     : "border-muted hover:border-muted-foreground/50"
                                 }`}
                               >
-                                <img
+                                <ImageWithLoader
                                   src={option.url}
                                   alt={option.name}
                                   className="w-full h-full object-cover"
@@ -200,13 +219,13 @@ export function CreateCertificateDialog({
                                 key={option.index}
                                 type="button"
                                 onClick={() => onDefaultLayoutChange(option)}
-                                className={`relative border-2 rounded-lg overflow-hidden transition-all ${
+                                className={`relative border-2 rounded-lg overflow-hidden transition-all aspect-[16/9] ${
                                   isSelected
                                     ? "border-primary ring-2 ring-primary"
                                     : "border-muted hover:border-muted-foreground/50"
                                 }`}
                               >
-                                <img
+                                <ImageWithLoader
                                   src={option.url}
                                   alt={option.name}
                                   className="w-full h-full object-cover"
