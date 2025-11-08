@@ -1,5 +1,5 @@
 import type { SuiClient } from "@mysten/sui/client";
-import supabase from "@/utils/supabase";
+import { supabaseAdmin } from "@/utils/supabase";
 import {
   getCertificatesForAccount,
   getCertificateFromBlockchain,
@@ -25,12 +25,32 @@ export async function getAccountRankings(
   limit: number = 10
 ): Promise<AccountRanking[]> {
   try {
+    // Use service role client to bypass RLS for public ranking
+    // This allows us to query all attendee accounts (role = 0) with PopChain addresses
+    if (!supabaseAdmin) {
+      console.error(
+        "Service role client not available. Cannot fetch rankings."
+      );
+      return [];
+    }
+
     // Get all PopChainAccount addresses from database
-    const { data: profiles, error } = await supabase
+    // Using service role to bypass RLS so we can see all accounts for public ranking
+    // Type assertion needed due to Supabase type inference limitations
+    type ProfileQueryResult = {
+      popchain_account_address: string | null;
+      wallet_address: string | null;
+    }[];
+
+    const { data: profiles, error } = (await supabaseAdmin
       .from("user_profiles")
       .select("popchain_account_address, wallet_address")
-      .not("popchain_account_address", "is", null)
-      .eq("role", 0);
+      .eq("role", 0)
+      .not("popchain_account_address", "is", null)) as {
+      data: ProfileQueryResult | null;
+      error: unknown;
+    };
+
     if (error) {
       console.error("Error fetching profiles:", error);
       return [];
