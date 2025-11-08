@@ -1,5 +1,7 @@
 // Certificate tier definitions matching smart contract tiers
 
+import { getFilePublicUrl } from "@/services/tusky";
+
 export type TierName = "PopPass" | "PopBadge" | "PopMedal" | "PopTrophy";
 
 export interface CertificateTier {
@@ -7,6 +9,7 @@ export interface CertificateTier {
   level: "Basic" | "Standard" | "Premium" | "Exclusive";
   description: string;
   imageFileName: string;
+  blobId: string;
   color: "purple" | "blue" | "red" | "yellow";
 }
 
@@ -16,6 +19,7 @@ export const CERTIFICATE_TIERS: CertificateTier[] = [
     level: "Basic",
     description: "Proof of Attendance",
     imageFileName: "pop_pass.png",
+    blobId: "nzywCgr-PQkmnnp3hdQari9Olp_uc-QYmpc4cdO4P-o",
     color: "purple",
   },
   {
@@ -23,6 +27,7 @@ export const CERTIFICATE_TIERS: CertificateTier[] = [
     level: "Standard",
     description: "Activity / Side Quest",
     imageFileName: "pop_badge.png",
+    blobId: "CmYARnNcHZoNL5kiZ7ISM86AEfho9zUYTJcTXJui8DM",
     color: "blue",
   },
   {
@@ -30,6 +35,7 @@ export const CERTIFICATE_TIERS: CertificateTier[] = [
     level: "Premium",
     description: "Distinction / Speaker",
     imageFileName: "pop_medal.png",
+    blobId: "9Zg9oNmYzrIL9IfWkNGN8RiK6MVTAnoFYE7W1rLOaI0",
     color: "red",
   },
   {
@@ -37,6 +43,7 @@ export const CERTIFICATE_TIERS: CertificateTier[] = [
     level: "Exclusive",
     description: "VIP / Sponsor",
     imageFileName: "pop_trophy.png",
+    blobId: "6vVBfxltZLyK-NcGUbEv0cm3Msq_0L2M_Y6U8AhBCz8",
     color: "yellow",
   },
 ];
@@ -57,16 +64,10 @@ export function getTierIndex(tierName: TierName): number {
 }
 
 /**
- * Get tier image URL from Supabase storage
+ * Get tier image URL from Tusky
  */
-export function getTierImageUrl(tier: CertificateTier): string {
-  // Use dynamic import to avoid circular dependencies
-  // This will be called from services that have access to supabase client
-  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-  const bucketName = "tiers";
-  const filePath = `${tier.imageFileName}`;
-  // Construct public URL - Supabase public storage URLs follow this pattern
-  return `${supabaseUrl}/storage/v1/object/public/${bucketName}/${filePath}`;
+export function getTierImageUrl(tier: CertificateTier): string | null {
+  return getFilePublicUrl(tier.blobId)!;
 }
 
 /**
@@ -74,16 +75,21 @@ export function getTierImageUrl(tier: CertificateTier): string {
  */
 export function getAllTierImageUrls(): Record<TierName, string> {
   const urls: Partial<Record<TierName, string>> = {};
+
   for (const tier of CERTIFICATE_TIERS) {
-    urls[tier.name] = getTierImageUrl(tier);
+    urls[tier.name] = getFilePublicUrl(tier.blobId)!;
   }
+
   return urls as Record<TierName, string>;
 }
 
 /**
  * Get badge color classes for a tier
  */
-export function getTierBadgeColor(tier: CertificateTier): string {
+export function getTierBadgeColor(tierName: TierName): string {
+  const tier = getTierByName(tierName);
+  if (!tier) return ""; // Or a default color
+
   const colorMap = {
     purple:
       "bg-purple-500/10 text-purple-700 dark:text-purple-400 border-purple-500/20",

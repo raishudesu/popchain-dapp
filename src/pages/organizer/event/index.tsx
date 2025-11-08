@@ -1,11 +1,11 @@
 import { useParams } from "react-router";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   useSuiClient,
   useSignAndExecuteTransaction,
   useCurrentAccount,
 } from "@mysten/dapp-kit";
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -16,6 +16,8 @@ import {
   Trash2,
   Plus,
   X,
+  Image as ImageIcon,
+  Clock,
 } from "lucide-react";
 import { toast } from "sonner";
 import type { Event } from "@/types/database";
@@ -35,6 +37,7 @@ import {
   fetchCertificatesByEventId,
   deleteCertificate,
   createCertificateFromDefault,
+  updateCertificateImageUrl,
   type DefaultCertificateOption,
 } from "@/services/certificates";
 import type { TierName } from "@/lib/certificate-tiers";
@@ -44,6 +47,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { Input } from "@/components/ui/input";
 import PopLoader from "@/components/pop-loader";
 import { Progress } from "@/components/ui/progress";
+import { Badge } from "@/components/ui/badge";
 import {
   Table,
   TableBody,
@@ -58,6 +62,198 @@ import { CloseEventDialog } from "@/pages/organizer/components/close-event-dialo
 import { CreateCertificateDialog } from "@/pages/organizer/components/create-certificate-dialog";
 import { QRCodeDialog } from "@/pages/organizer/components/qr-code-dialog";
 import { DeleteCertificateDialog } from "@/pages/organizer/components/delete-certificate-dialog";
+import { getImagePublicUrlByUploadId } from "@/services/tusky";
+
+/**
+ * Component to display a certificate image, handling tusky_upload_id fetching
+ */
+const CertificateImageCard = ({
+  certificate,
+  onDelete,
+  isDeleting,
+  eventActive,
+  onCertificateUpdate,
+}: {
+  certificate: Certificate;
+  onDelete: (certificateId: string, imageUrl: string) => void;
+  isDeleting: boolean;
+  eventActive: boolean;
+  onCertificateUpdate?: () => void;
+}) => {
+  const queryClient = useQueryClient();
+  const UNKNOWN_IMAGE_URL = "https://walrus.tusky.io/unknown";
+  const isUpdatingRef = useRef(false);
+
+  // Fetch image URL from tusky_upload_id if available
+  const { data: tuskyImageUrl, isLoading: isLoadingTuskyImage } = useQuery({
+    queryKey: [
+      "certificate-image",
+      certificate.id,
+      certificate.tusky_upload_id,
+    ],
+    queryFn: () => {
+      if (!certificate.tusky_upload_id) {
+        return null;
+      }
+      return getImagePublicUrlByUploadId(certificate.tusky_upload_id);
+    },
+    enabled: !!certificate.tusky_upload_id,
+    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
+    refetchOnWindowFocus: false,
+  });
+
+  // Update certificate image_url if it's "unknown" or empty and we have a valid URL from tusky
+  useEffect(() => {
+    const needsUpdate =
+      certificate.image_url === UNKNOWN_IMAGE_URL ||
+      certificate.image_url === "";
+    const shouldUpdate =
+      needsUpdate &&
+      certificate.tusky_upload_id &&
+      tuskyImageUrl !== null &&
+      tuskyImageUrl !== undefined &&
+      tuskyImageUrl !== "" &&
+      !isLoadingTuskyImage &&
+      !isUpdatingRef.current;
+
+    if (shouldUpdate && tuskyImageUrl) {
+      isUpdatingRef.current = true;
+      updateCertificateImageUrl(certificate.id, tuskyImageUrl)
+        .then(() => {
+          // Invalidate certificates query to refetch updated data
+          queryClient.invalidateQueries({
+            queryKey: ["certificates", certificate.event_id],
+          });
+          // Call callback if provided
+          onCertificateUpdate?.();
+        })
+        .catch((error) => {
+          console.error("Failed to update certificate image URL:", error);
+          isUpdatingRef.current = false; // Reset on error so we can retry
+        })
+        .finally(() => {
+          // Reset after a delay to allow for query invalidation to complete
+          setTimeout(() => {
+            isUpdatingRef.current = false;
+          }, 1000);
+        });
+    }
+  }, [
+    certificate.id,
+    certificate.image_url,
+    certificate.tusky_upload_id,
+    certificate.event_id,
+    tuskyImageUrl,
+    isLoadingTuskyImage,
+    queryClient,
+    onCertificateUpdate,
+  ]);
+
+  // Determine which image URL to use
+  // Priority: tuskyImageUrl (if available) > certificate.image_url (fallback)
+  const imageUrl = tuskyImageUrl ?? certificate.image_url;
+
+  // Check if metadata is still not available (tusky_upload_id exists but URL is null after loading)
+  const metadataUnavailable =
+    !!certificate.tusky_upload_id &&
+    !isLoadingTuskyImage &&
+    tuskyImageUrl === null;
+
+  // Check if certificate is ready (has valid image URL)
+  // Ready if we have a valid imageUrl and we're not in a loading or unavailable state
+  const isReady =
+    imageUrl &&
+    imageUrl !== "" &&
+    imageUrl !== UNKNOWN_IMAGE_URL &&
+    !isLoadingTuskyImage &&
+    !metadataUnavailable;
+
+  return (
+    <div className="relative border rounded-lg overflow-hidden bg-muted group">
+      <div className="relative">
+        {isLoadingTuskyImage && certificate.tusky_upload_id ? (
+          <div className="w-full aspect-video flex items-center justify-center bg-muted">
+            <Spinner className="w-6 h-6" />
+          </div>
+        ) : metadataUnavailable ? (
+          <div className="w-full aspect-video flex flex-col items-center justify-center bg-muted p-4">
+            <ImageIcon className="w-8 h-8 text-muted-foreground mb-2" />
+            <p className="text-xs text-center text-muted-foreground">
+              Image exists
+            </p>
+            <p className="text-xs text-center text-muted-foreground">
+              Metadata unavailable
+            </p>
+          </div>
+        ) : (
+          <img
+            src={imageUrl || ""}
+            alt={certificate.name || "Certificate"}
+            className="w-full h-full object-cover"
+            onError={(e) => {
+              // Fallback to image_url if tusky URL fails
+              if (
+                certificate.tusky_upload_id &&
+                imageUrl !== certificate.image_url
+              ) {
+                e.currentTarget.src = certificate.image_url;
+              }
+            }}
+          />
+        )}
+        <div className="absolute top-2 left-2 flex items-center gap-2">
+          <div className="bg-background/90 px-2 py-1 rounded text-xs font-medium">
+            {certificate.name || "Certificate"}
+          </div>
+          {/* Status badge */}
+          {isReady ? (
+            <Badge
+              variant="outline"
+              className="bg-green-500/10 border-green-500/20 text-green-700 dark:text-green-400"
+            >
+              <CheckCircle2 className="w-3 h-3" />
+              Ready
+            </Badge>
+          ) : (
+            <Badge
+              variant="outline"
+              className="bg-yellow-500/10 border-yellow-500/20 text-yellow-700 dark:text-yellow-400"
+            >
+              <Clock className="w-3 h-3" />
+              Processing
+            </Badge>
+          )}
+        </div>
+        <div className="absolute top-2 right-2 flex gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+          <QRCodeDialog certificate={certificate} />
+          <DeleteCertificateDialog
+            certificate={certificate}
+            onConfirm={onDelete}
+            isDeleting={isDeleting}
+            disabled={!eventActive}
+          />
+        </div>
+      </div>
+      <div className="p-3 space-y-2">
+        <div className="flex items-center gap-2">
+          {certificate.tier_image_url && (
+            <img
+              src={certificate.tier_image_url}
+              alt={certificate.tier_name}
+              className="w-6 h-6 object-contain"
+            />
+          )}
+          <div>
+            <p className="font-semibold text-sm">{certificate.tier_name}</p>
+            <p className="text-xs text-muted-foreground">
+              {certificate.tier_level} • {certificate.tier_description}
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 const EventDetailsPage = () => {
   const { eventId } = useParams<{ eventId: string }>();
@@ -676,50 +872,16 @@ const EventDetailsPage = () => {
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4 items-center justify-center">
               {customCertificates.map((certificate) => (
-                <div
+                <CertificateImageCard
                   key={certificate.id}
-                  className="relative border rounded-lg overflow-hidden bg-muted group"
-                >
-                  <div className="relative">
-                    <img
-                      src={certificate.image_url}
-                      alt={certificate.name || "Certificate"}
-                      className="w-full h-full object-cover"
-                    />
-                    <div className="absolute top-2 left-2 bg-background/90 px-2 py-1 rounded text-xs font-medium">
-                      {certificate.name || "Certificate"}
-                    </div>
-                    <div className="absolute top-2 right-2 flex gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
-                      <QRCodeDialog certificate={certificate} />
-                      <DeleteCertificateDialog
-                        certificate={certificate}
-                        onConfirm={handleDeleteCertificate}
-                        isDeleting={deleteCertificateMutation.isPending}
-                        disabled={!event?.active}
-                      />
-                    </div>
-                  </div>
-                  <div className="p-3 space-y-2">
-                    <div className="flex items-center gap-2">
-                      {certificate.tier_image_url && (
-                        <img
-                          src={certificate.tier_image_url}
-                          alt={certificate.tier_name}
-                          className="w-6 h-6 object-contain"
-                        />
-                      )}
-                      <div>
-                        <p className="font-semibold text-sm">
-                          {certificate.tier_name}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {certificate.tier_level} •{" "}
-                          {certificate.tier_description}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
+                  certificate={certificate}
+                  onDelete={handleDeleteCertificate}
+                  isDeleting={deleteCertificateMutation.isPending}
+                  eventActive={event?.active ?? false}
+                  onCertificateUpdate={() => {
+                    refetchCertificates();
+                  }}
+                />
               ))}
             </div>
           )}

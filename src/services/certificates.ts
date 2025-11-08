@@ -8,6 +8,11 @@ import {
 } from "@/lib/certificate-tiers";
 import type { SuiClient } from "@mysten/sui/client";
 import { CONTRACT_PACKAGE_ID } from "@/lib/constants";
+import {
+  getFilePublicUrl,
+  uploadImageToTusky,
+  getImagePublicUrlByUploadId,
+} from "./tusky";
 
 /**
  * Certificate object structure from blockchain
@@ -154,7 +159,7 @@ export async function getCertificateFromBlockchain(
           name: tierName,
           level: tierDefinition.level,
           description: tierDefinition.description,
-          imageUrl: tierUrl || getTierImageUrl(tierDefinition),
+          imageUrl: tierUrl || getTierImageUrl(tierDefinition)!,
         };
       } else {
         // Fallback if tier definition not found
@@ -383,54 +388,37 @@ export async function validateImageDimensions(
  * Default certificate option with index and URL
  */
 export interface DefaultCertificateOption {
-  index: number; // 1-4
+  index: number; // 1-8
   name: string; // "cert-1.png", "cert-2.png", etc.
   url: string;
 }
 
 /**
- * Get default certificate URLs from Supabase storage
- * Default certificates are stored in certificates/defaults/ with names cert-1.png through cert-4.png
- * All default certificates are 1080x1920
- * @returns Array of default certificate options with URLs
+ * Get default certificate URLs from Tusky.
+ * This function requires the blobIds for the default certificate images to be provided.
+ * @returns Array of default certificate options with URLs.
  */
-export async function getDefaultCertificateOptions(): Promise<
-  DefaultCertificateOption[]
-> {
-  const bucketName = "certificates";
-  const folderPath = "defaults";
-
-  // Get public URL for each default certificate
-  const defaultCertFiles = [
-    "cert-1.png",
-    "cert-2.png",
-    "cert-3.png",
-    "cert-4.png",
-    "cert-5.png",
-    "cert-6.png",
-    "cert-7.png",
-    "cert-8.png",
+export function getDefaultCertificateOptions(): DefaultCertificateOption[] {
+  const defaultCertificateBlobIds = [
+    "MTYP_J8S3Sx01ngH-rlaUu1oJ33gb3zNfnE2ckAgUcI",
+    "8sYZBOrzrhQji83nXXoe_WoS-zsueuDNRGxnGfK3Q8c",
+    "k-6h5Q0vZipxhJCGTWcD8yimhqaIs9bCzww7n-mhUac",
+    "VemrLWIut-z8-0Wol2WS8LrLQY39I3Bx6MeZww83raA",
+    "bDgpXTwlDdh4aA1CT976ubMUsc1YOORb5TTHIW4VZjo",
+    "ZEJ0u4jWPWhYMWJLig0GngbyliX8GKyk2ZUTBARKLu0",
+    "wiUMCiW1k6nM2eIwX28KuAKoHavQZZDc8h6fYz2j-Q0",
+    "peXNPHOChiCsHlC6EcZglwAAn8X7I7jQix89tx3u7cY",
   ];
-  const options: DefaultCertificateOption[] = [];
 
-  for (let i = 0; i < defaultCertFiles.length; i++) {
-    const fileName = defaultCertFiles[i];
-    const filePath = `${folderPath}/${fileName}`;
-    const { data } = supabase.storage.from(bucketName).getPublicUrl(filePath);
-    if (data?.publicUrl) {
-      options.push({
-        index: i + 1,
-        name: fileName,
-        url: data.publicUrl,
-      });
-    }
-  }
-
-  return options;
+  return defaultCertificateBlobIds.map((blobId, index) => ({
+    index: index + 1,
+    name: `cert-${index + 1}.png`,
+    url: getFilePublicUrl(blobId)!, // Non-null assertion: blobId string always returns string URL
+  }));
 }
 
 /**
- * Get tier image URL from Supabase storage
+ * Get tier image URL from Tusky
  * @param tierName - Tier name
  * @returns Public URL to tier image
  */
@@ -439,65 +427,21 @@ export function getTierImageUrlByName(tierName: TierName): string {
   if (!tier) {
     throw new Error(`Invalid tier name: ${tierName}`);
   }
-  return getTierImageUrl(tier);
+  return getTierImageUrl(tier)!;
 }
 
 /**
- * Upload a custom certificate image to Supabase storage
- * Uses admin client to bypass RLS
+ * Upload a custom certificate image to Tusky.
  * @param file - Image file to upload (suggested sizes: 1920x1080 or 1080x1920)
- * @param eventId - Event ID for organizing files
- * @param userId - User ID uploading the certificate
- * @returns Promise with public URL of uploaded image
+ * @returns Promise with public URL of uploaded image.
  */
-export async function uploadCertificateImage(
-  file: File,
-  eventId: string,
-  userId: string
-): Promise<string> {
-  if (!supabaseAdmin) {
-    throw new Error(
-      "Service role key not configured. Please set VITE_SERVICE_ROLE_KEY"
-    );
-  }
-
+export async function uploadCertificateImage(file: File): Promise<string> {
   // Validate file is an image
   if (!file.type.startsWith("image/")) {
     throw new Error("File must be an image");
   }
 
-  const bucketName = "certificates";
-  const folderPath = "custom";
-
-  // Generate unique filename: eventId_userId_timestamp.ext
-  const timestamp = Date.now();
-  const extension = file.name.split(".").pop() || "png";
-  const fileName = `${eventId}_${userId}_${timestamp}.${extension}`;
-  const filePath = `${folderPath}/${fileName}`;
-
-  // Upload to Supabase storage using admin client to bypass RLS
-  const { error } = await supabaseAdmin.storage
-    .from(bucketName)
-    .upload(filePath, file, {
-      contentType: file.type,
-      upsert: false, // Don't overwrite existing files
-    });
-
-  if (error) {
-    console.error("Error uploading certificate:", error);
-    throw new Error(`Failed to upload certificate: ${error.message}`);
-  }
-
-  // Get public URL using admin client
-  const { data: urlData } = supabaseAdmin.storage
-    .from(bucketName)
-    .getPublicUrl(filePath);
-
-  if (!urlData?.publicUrl) {
-    throw new Error("Failed to get public URL for uploaded certificate");
-  }
-
-  return urlData.publicUrl;
+  return await uploadImageToTusky(file);
 }
 
 /**
@@ -578,9 +522,40 @@ export async function fetchCertificatesByEventId(
 }
 
 /**
+ * Update a certificate's image_url
+ * @param certificateId - Certificate ID to update
+ * @param imageUrl - New image URL
+ * @returns Promise with updated certificate
+ */
+export async function updateCertificateImageUrl(
+  certificateId: string,
+  imageUrl: string
+): Promise<Certificate> {
+  if (!supabaseAdmin) {
+    throw new Error(
+      "Service role key not configured. Please set VITE_SERVICE_ROLE_KEY"
+    );
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (supabaseAdmin.from("certificates") as any)
+    .update({ image_url: imageUrl })
+    .eq("id", certificateId)
+    .select()
+    .single();
+
+  if (error) {
+    console.error("Error updating certificate image URL:", error);
+    throw new Error(`Failed to update certificate: ${error.message}`);
+  }
+
+  return data as Certificate;
+}
+
+/**
  * Create certificate from default layout
  * @param defaultLayoutUrl - URL of the default certificate layout
- * @param defaultLayoutIndex - Index of the default layout (1-4)
+ * @param defaultLayoutIndex - Index of the default layout (1-8)
  * @param eventId - Event ID
  * @param userId - User ID
  * @param tierName - Tier name for this certificate
@@ -640,17 +615,23 @@ export async function uploadAndCreateCertificate(
     throw new Error(`Invalid tier name: ${tierName}`);
   }
 
-  // Upload image
-  const imageUrl = await uploadCertificateImage(file, eventId, userId);
+  // Upload image to Tusky and get uploadId
+  const uploadId = await uploadCertificateImage(file);
 
   const tierImageUrl = getTierImageUrl(tier);
   const tierIndex = getTierIndex(tierName);
 
+  // Try to get the public URL immediately (may be null if metadata not available)
+  const imageUrl = await getImagePublicUrlByUploadId(uploadId);
+
   // Create database record
+  // Store uploadId in tusky_upload_id field
+  // Store imageUrl if available, otherwise use empty string (will be fetched when displaying)
   const certificateData: CertificateInsert = {
     event_id: eventId,
     user_id: userId,
-    image_url: imageUrl,
+    image_url: imageUrl || "", // Empty if metadata not available yet
+    tusky_upload_id: uploadId, // Store uploadId for later metadata retrieval
     name: name || null,
     is_default: false,
     tier_name: tier.name,
@@ -664,10 +645,8 @@ export async function uploadAndCreateCertificate(
 }
 
 /**
- * Delete a certificate (removes from storage and database)
- * Uses admin client to bypass RLS
+ * Delete a certificate (removes from database and Tusky)
  * @param certificateId - Certificate ID to delete
- * @param imageUrl - URL of the image to delete from storage
  * @returns Promise<void>
  */
 export async function deleteCertificate(certificateId: string): Promise<void> {
@@ -677,14 +656,25 @@ export async function deleteCertificate(certificateId: string): Promise<void> {
     );
   }
 
-  // Delete from database using admin client to bypass RLS
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { error: dbError } = await (supabaseAdmin.from("certificates") as any)
+  // First, fetch the certificate to get the image URL
+  const certificate = await fetchCertificateById(certificateId);
+  if (!certificate) {
+    console.warn(
+      `Certificate with ID ${certificateId} not found. Cannot delete.`
+    );
+    return;
+  }
+
+  // Delete from database
+  const { error: dbError } = await supabaseAdmin
+    .from("certificates")
     .delete()
     .eq("id", certificateId);
 
   if (dbError) {
     console.error("Error deleting certificate from database:", dbError);
-    throw new Error(`Failed to delete certificate: ${dbError.message}`);
+    throw new Error(
+      `Failed to delete certificate from database: ${dbError.message}`
+    );
   }
 }

@@ -153,7 +153,7 @@ export function CertificateDetailsDialog({
                           variant="outline"
                           className={
                             tierDef
-                              ? getTierBadgeColor(tierDef)
+                              ? getTierBadgeColor(tierDef.name)
                               : "bg-gray-500/10 text-gray-700 dark:text-gray-400 border-gray-500/20"
                           }
                         >
