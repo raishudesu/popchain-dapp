@@ -12,7 +12,15 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
-import { Trophy, Medal, Award, Hash, Copy, Check } from "lucide-react";
+import {
+  Trophy,
+  Medal,
+  Award,
+  Hash,
+  Copy,
+  Check,
+  ExternalLink,
+} from "lucide-react";
 import { getAccountRankings } from "@/services/ranking";
 import { toast } from "sonner";
 import { useState } from "react";
@@ -81,9 +89,7 @@ const Ranking = () => {
     <section id="ranking" className="py-20 px-4 sm:px-6 lg:px-8">
       <div className="max-w-6xl mx-auto">
         <div className="text-center mb-12">
-          <h2 className="text-3xl md:text-4xl font-bold mb-4">
-            Top PopChain Accounts
-          </h2>
+          <h2 className="text-3xl md:text-4xl font-bold mb-4">Top Accounts</h2>
           <p className="text-muted-foreground text-lg">
             See who has collected the most certificates across all tiers
           </p>
@@ -160,6 +166,19 @@ const Ranking = () => {
                                 <Copy className="w-3.5 h-3.5 text-muted-foreground" />
                               )}
                             </Button>
+                            <a
+                              href={`https://suiscan.xyz/testnet/object/${account.accountAddress}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                            >
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7"
+                              >
+                                <ExternalLink className="w-3.5 h-3.5 text-muted-foreground" />
+                              </Button>
+                            </a>
                           </div>
                         </TableCell>
                         <TableCell className="text-center">
