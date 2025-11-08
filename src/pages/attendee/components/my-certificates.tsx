@@ -247,8 +247,10 @@ export function MyCertificates() {
       </Card>
     );
   }
+  const reverseCertificate = () =>
+    certificates ? [...certificates].slice().reverse() : [];
 
-  const certificateList = certificates || [];
+  const certificateList = reverseCertificate();
 
   return (
     <Card>

@@ -8,6 +8,7 @@ import {
 } from "@/utils/unclaimed-certificate";
 import { fetchCertificateById } from "@/services/certificates";
 import { ClaimCertificateDialog } from "./claim-certificate-dialog";
+import { useQueryClient } from "@tanstack/react-query";
 
 /**
  * Component that checks for unclaimed certificates in sessionStorage
@@ -24,6 +25,7 @@ export function UnclaimedCertificateChecker() {
   const suiClient = useSuiClient();
   const [certificateId, setCertificateId] = useState<string | null>(null);
   const [hasChecked, setHasChecked] = useState(false);
+  const queryClient = useQueryClient();
 
   // Check for unclaimed certificate once user is logged in
   useEffect(() => {
@@ -111,6 +113,7 @@ export function UnclaimedCertificateChecker() {
     setIsDialogOpen(false);
     setUserDismissed(false); // Reset dismissed flag
     setHasChecked(false); // Allow checking again if new certificate is added
+    queryClient.invalidateQueries({ queryKey: ["my-certificates"] });
   };
 
   const handleClaimFailedNotWhitelisted = () => {

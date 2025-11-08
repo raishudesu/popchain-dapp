@@ -52,6 +52,7 @@ export function ClaimCertificateDialog({
   const [isClaiming, setIsClaiming] = useState(false);
   const { profile } = useAuth();
   const navigate = useNavigate();
+
   // Use certificate from prop (parent manages fetching)
   const certificate = certificateProp || null;
 
